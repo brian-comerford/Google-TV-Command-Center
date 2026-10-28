@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 320x180 launcher banner shown on the Google TV home row. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:fillColor="#0B0F17" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#1C2533" android:pathData="M0,120h320v60h-320z" />
+    <!-- scoreboard bars -->
+    <path android:fillColor="#FF3B30" android:pathData="M24,28h12v12h-12z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M44,30h90v8h-90z" />
+    <path android:fillColor="#34C759" android:pathData="M24,52h140v10h-140z" />
+    <path android:fillColor="#FFB020" android:pathData="M24,72h96v10h-96z" />
+    <path android:fillColor="#3D8BFF" android:pathData="M24,92h120v10h-120z" />
+    <!-- big ball glyph -->
+    <path android:fillColor="#FFFFFF" android:pathData="M240,70m-44,0a44,44 0,1 1,88 0a44,44 0,1 1,-88 0" />
+    <path android:fillColor="#0B0F17" android:pathData="M240,70m-36,0a36,36 0,1 1,72 0a36,36 0,1 1,-72 0" />
+    <path android:fillColor="#FF3B30" android:pathData="M234,40h12v60h-12z" />
+    <path android:fillColor="#FF3B30" android:pathData="M210,64h60v12h-60z" />
+    <!-- wordmark stripe -->
+    <path android:fillColor="#FFFFFF" android:pathData="M24,140h160v6h-160z" />
+    <path android:fillColor="#8B95A7" android:pathData="M24,154h110v5h-110z" />
+</vector>
