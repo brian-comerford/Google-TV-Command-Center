@@ -4,21 +4,10 @@
 (function () {
   'use strict';
 
-  const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
   const RELAY = 'https://ntfy.sh';
   const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 
-  const LEAGUES = [
-    { id: 'NFL', sport: 'football', path: 'nfl', label: 'NFL', kind: 'football' },
-    { id: 'NCAAF', sport: 'football', path: 'college-football', label: 'College Football', kind: 'football' },
-    { id: 'NBA', sport: 'basketball', path: 'nba', label: 'NBA', kind: 'basketball' },
-    { id: 'WNBA', sport: 'basketball', path: 'wnba', label: 'WNBA', kind: 'basketball' },
-    { id: 'NCAAM', sport: 'basketball', path: 'mens-college-basketball', label: 'College Basketball', kind: 'basketball' },
-    { id: 'MLB', sport: 'baseball', path: 'mlb', label: 'MLB', kind: 'baseball' },
-    { id: 'NHL', sport: 'hockey', path: 'nhl', label: 'NHL', kind: 'hockey' },
-    { id: 'MLS', sport: 'soccer', path: 'usa.1', label: 'MLS', kind: 'soccer' },
-    { id: 'EPL', sport: 'soccer', path: 'eng.1', label: 'Premier League', kind: 'soccer' },
-  ];
+  const { LEAGUES, teamsUrl, rosterUrl, parseTeams, parseRoster } = window.EspnShared;
   const STATS = {
     football: [
       ['pass_yds', 'Passing Yards', 'Pass Yds'], ['pass_td', 'Passing TDs', 'Pass TD'], ['pass_cmp', 'Completions', 'Cmp'],
@@ -86,32 +75,23 @@
   const topicTv = c => `scc-tv-${normalize(c).toLowerCase()}-tv`;
   const pretty = c => { const n = normalize(c); return n.slice(0, 4) + '-' + n.slice(4); };
 
-  // ---------- ESPN ----------
+  // ---------- teams & rosters ----------
+  // Browsers can't call ESPN directly from another site (no CORS), so a daily GitHub Action saves
+  // every league's teams and rosters next to this page (tools/build-web-data.js). Live ESPN is a fallback.
   const cache = {};
-  async function espn(league, path) {
-    const url = `${ESPN}/${league.sport}/${league.path}/${path}`;
+  function getJson(url) {
     if (!cache[url]) {
-      cache[url] = fetch(url).then(r => { if (!r.ok) throw new Error('ESPN returned ' + r.status); return r.json(); });
+      cache[url] = fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
       cache[url].catch(() => delete cache[url]);
     }
     return cache[url];
   }
-  async function teams(league) {
-    const j = await espn(league, 'teams?limit=1000');
-    const list = ((((j.sports || [])[0] || {}).leagues || [])[0] || {}).teams || [];
-    return list.map(w => w.team || w).filter(t => t && t.id).map(t => ({
-      id: String(t.id), abbreviation: t.abbreviation || '', name: t.displayName || t.name || '',
-      short: t.shortDisplayName || t.name || '', logo: ((t.logos || [])[0] || {}).href || null, color: t.color || null,
-    })).sort((a, b) => a.name.localeCompare(b.name));
+  async function firstOf(local, live, parse) {
+    try { return await getJson(local); } catch (e) { /* not built yet: try ESPN itself */ }
+    try { return parse(await getJson(live)); } catch (e) { throw new Error('the team data isn\'t available yet. Try again in a few minutes.'); }
   }
-  async function roster(league, teamId) {
-    const j = await espn(league, `teams/${teamId}/roster`);
-    const flat = (j.athletes || []).flatMap(a => Array.isArray(a.items) ? a.items : [a]);
-    return flat.filter(a => a && a.id).map(a => ({
-      id: String(a.id), name: a.displayName || a.fullName || '', position: (a.position || {}).abbreviation || null,
-      jersey: a.jersey || null, headshot: (a.headshot || {}).href || null,
-    }));
-  }
+  const teams = league => firstOf(`data/${league.id}/teams.json`, teamsUrl(league), parseTeams);
+  const roster = (league, teamId) => firstOf(`data/${league.id}/roster-${teamId}.json`, rosterUrl(league, teamId), parseRoster);
 
   // ---------- render list ----------
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -246,7 +226,7 @@
       };
       draw('');
       search.oninput = () => draw(search.value);
-    }).catch(err => { body.innerHTML = `<p class="error">Couldn't load from ESPN: ${esc(err.message)}</p>`; });
+    }).catch(err => { body.innerHTML = `<p class="error">Couldn't load the list: ${esc(err.message)}</p>`; });
   }
   function push(step) { addStack.push(step); showStep(step); }
   $('addBack').addEventListener('click', () => { if (addStack.length > 1) { addStack.pop(); showStep(addStack[addStack.length - 1]); } });

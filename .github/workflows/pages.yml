@@ -2,8 +2,11 @@ name: Phone website
 
 on:
   push:
-    paths: ["web/**", ".github/workflows/pages.yml"]
+    paths: ["web/**", "tools/build-web-data.js", ".github/workflows/pages.yml"]
   workflow_dispatch:
+  # Refresh team rosters daily (trades, signings, call-ups).
+  schedule:
+    - cron: "17 10 * * *"
 
 permissions:
   contents: read
@@ -27,6 +30,11 @@ jobs:
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Save teams and rosters from ESPN
+        run: node tools/build-web-data.js web/data
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
