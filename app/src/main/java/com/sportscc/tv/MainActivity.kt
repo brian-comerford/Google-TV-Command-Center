@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -114,6 +115,17 @@ class MainActivity : ComponentActivity() {
         val feed by engine.feed.collectAsStateWithLifecycle()
         val watchlist by store.watchlist.collectAsStateWithLifecycle()
         val settings by store.settings.collectAsStateWithLifecycle()
+
+        // Screen updates don't count as activity, so without this the screen saver starts mid-game.
+        val keepOn = when (settings.keepAwake) {
+            KeepAwake.ALWAYS -> true
+            KeepAwake.LIVE -> dashboard?.anyLive == true
+            KeepAwake.NEVER -> false
+        }
+        LaunchedEffect(keepOn) {
+            if (keepOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
 
         val stack = remember { mutableStateListOf<Screen>(Screen.Home) }
         fun push(s: Screen) = stack.add(s)

@@ -22,7 +22,11 @@ data class AppSettings(
     val liveFirst: Boolean = false,
     /** Home-screen card columns: 2 side by side, or 1 wide column. */
     val cardColumns: Int = 2,
+    /** When to stop Google TV's screen saver while the app is on screen. */
+    val keepAwake: KeepAwake = KeepAwake.LIVE,
 )
+
+enum class KeepAwake { LIVE, ALWAYS, NEVER }
 
 /** Watchlist + settings, persisted as JSON in SharedPreferences. */
 class WatchlistStore(context: Context) {

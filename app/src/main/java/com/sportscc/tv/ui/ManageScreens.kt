@@ -41,6 +41,7 @@ import com.sportscc.core.StatDef
 import com.sportscc.core.StatFormat
 import com.sportscc.core.WatchItem
 import com.sportscc.tv.AppSettings
+import com.sportscc.tv.KeepAwake
 
 @Composable
 fun PropsScreen(player: PlayerWatch, onChange: (List<Prop>) -> Unit, onDone: () -> Unit) = ScreenFrame {
@@ -212,6 +213,17 @@ fun SettingsScreen(
             }
         }
         Hint("ESPN's feed itself updates every ~15–30s, so going lower mostly costs bandwidth.")
+
+        SectionLabel("Keep the screen awake")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FocusButton("During live games", { onChange { it.copy(keepAwake = KeepAwake.LIVE) } }, selected = settings.keepAwake == KeepAwake.LIVE)
+            FocusButton("Always", { onChange { it.copy(keepAwake = KeepAwake.ALWAYS) } }, selected = settings.keepAwake == KeepAwake.ALWAYS)
+            FocusButton("Never", { onChange { it.copy(keepAwake = KeepAwake.NEVER) } }, selected = settings.keepAwake == KeepAwake.NEVER)
+        }
+        Hint(
+            "Stops Google TV's screen saver while this app is open. During live games lets it run when nothing you " +
+                "follow is on; Always keeps the scores up any time, but a still screen left on for hours can burn in on some TVs.",
+        )
 
         SectionLabel("Card layout on the home screen")
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
