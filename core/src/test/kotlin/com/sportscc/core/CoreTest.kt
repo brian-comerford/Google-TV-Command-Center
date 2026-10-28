@@ -47,6 +47,7 @@ class ParserTest {
         // PPR: 245*.04 + 2*4 - 2 + 41*.1 + 6 = 9.8 + 8 - 2 + 4.1 + 6
         assertEquals(25.9, StatCatalog.find(League.NFL, "fpts_ppr")!!.evaluate(allen)!!, 1e-9)
         assertEquals(1.0, StatCatalog.find(League.NFL, "any_td")!!.evaluate(allen)!!, 1e-9)
+        assertEquals(27.0, StatCatalog.find(League.NFL, "pass_att")!!.evaluate(allen)!!, 1e-9)
     }
 
     @Test

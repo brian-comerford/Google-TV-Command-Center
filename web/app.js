@@ -10,7 +10,7 @@
   const { LEAGUES, teamsUrl, rosterUrl, parseTeams, parseRoster } = window.EspnShared;
   const STATS = {
     football: [
-      ['pass_yds', 'Passing Yards', 'Pass Yds'], ['pass_td', 'Passing TDs', 'Pass TD'], ['pass_cmp', 'Completions', 'Cmp'],
+      ['pass_yds', 'Passing Yards', 'Pass Yds'], ['pass_td', 'Passing TDs', 'Pass TD'], ['pass_cmp', 'Completions', 'Cmp'], ['pass_att', 'Pass Attempts', 'Pass Att'],
       ['pass_int', 'Interceptions Thrown', 'INT'], ['rush_yds', 'Rushing Yards', 'Rush Yds'], ['rush_att', 'Rush Attempts', 'Carries'],
       ['rush_td', 'Rushing TDs', 'Rush TD'], ['rec', 'Receptions', 'Rec'], ['rec_yds', 'Receiving Yards', 'Rec Yds'],
       ['rec_td', 'Receiving TDs', 'Rec TD'], ['rush_rec_yds', 'Rush + Rec Yards', 'Rush+Rec'], ['any_td', 'Anytime TD (rush/rec)', 'TDs'],
@@ -289,6 +289,134 @@
     dlg.close(); changed();
     openProp(i);
   }
+
+  // ---------- import from Player Prop Finder ----------
+  // That app publishes its picks as static JSON on GitHub Pages (github.com/brian-comerford/Player-Prop-Finder).
+  // Its player ids are nflverse ids, so players are matched to ESPN by name and team.
+  const PROP_FINDER = 'https://brian-comerford.github.io/Player-Prop-Finder/data/';
+  const PF_MARKETS = {
+    player_pass_yds: 'pass_yds', player_pass_tds: 'pass_td', player_pass_attempts: 'pass_att',
+    player_pass_interceptions: 'pass_int', player_rush_yds: 'rush_yds', player_rush_attempts: 'rush_att',
+    player_receptions: 'rec', player_reception_yds: 'rec_yds', player_rush_reception_yds: 'rush_rec_yds',
+    player_anytime_td: 'any_td',
+  };
+  const NFLVERSE_TO_ESPN_TEAM = { LA: 'LAR', WAS: 'WSH' };
+  const nameKey = n => String(n).toLowerCase().replace(/\b(jr|sr|ii|iii|iv|v)\b\.?/g, '').replace(/[^a-z]/g, '');
+
+  const idlg = $('importDialog');
+  let picks = [], conf = 'all';
+  const selected = new Set();
+
+  async function loadPicks() {
+    const get = f => fetch(PROP_FINDER + f + '?v=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null);
+    const [props, tds, meta] = await Promise.all([get('props.json'), get('anytime_td_props.json'), get('meta.json')]);
+    if (!props && !tds) throw new Error("couldn't reach Player Prop Finder");
+    const all = (props || []).concat(tds || []);
+    picks = all
+      .filter(p => PF_MARKETS[p.market] && p.recommended_edge > 0)
+      .map((p, i) => ({
+        id: i, raw: p, statId: PF_MARKETS[p.market],
+        line: p.line == null ? 0.5 : p.line,
+        side: p.recommended_side === 'under' ? 'UNDER' : 'OVER',
+        price: p.recommended_side === 'under' ? p.price_under : p.price_over,
+      }))
+      .sort((a, b) => b.raw.recommended_edge - a.raw.recommended_edge);
+    return meta;
+  }
+  function havePick(pk) {
+    return items.some(it => it.type === 'player' && it.league === 'NFL' && nameKey(it.name) === nameKey(pk.raw.player_name) &&
+      (it.props || []).some(p => p.statId === pk.statId && p.line === pk.line && p.side === pk.side));
+  }
+  function renderPicks() {
+    const shown = picks.filter(p => conf === 'all' || p.raw.confidence === 'High' || (conf === 'Medium' && p.raw.confidence === 'Medium'));
+    $('importList').innerHTML = shown.length ? shown.map(pk => {
+      const p = pk.raw, have = havePick(pk);
+      const price = pk.price == null ? '' : ` · ${pk.price > 0 ? '+' : ''}${pk.price}`;
+      const what = pk.statId === 'any_td' ? 'Anytime TD' : `${pk.side === 'UNDER' ? 'Under' : 'Over'} ${num(pk.line)} ${esc(p.market_label)}`;
+      return `<label class="pickrow${have ? ' have' : ''}">
+        <input type="checkbox" data-pick="${pk.id}"${selected.has(pk.id) ? ' checked' : ''}${have ? ' disabled' : ''}>
+        <span style="min-width:0"><span class="what">${esc(p.player_name)}</span> <span class="sub">${esc(p.team)} vs ${esc(p.opponent)}</span><br>
+          ${what}<span class="sub">${price}</span><span class="conf ${esc(p.confidence)}">${esc(p.confidence)}</span>${have ? ' <span class="sub">· on your list</span>' : ''}</span>
+        <span class="edge">+${(p.recommended_edge * 100).toFixed(1)}%<br><span class="sub">edge</span></span>
+      </label>`;
+    }).join('') : '<p class="muted">No picks match this filter.</p>';
+    $('importCount').textContent = `${selected.size} selected`;
+    $('importGo').disabled = !selected.size;
+  }
+  $('importList').addEventListener('change', e => {
+    const id = Number(e.target.dataset.pick);
+    if (e.target.checked) selected.add(id); else selected.delete(id);
+    $('importCount').textContent = `${selected.size} selected`;
+    $('importGo').disabled = !selected.size;
+  });
+  $('importFilters').addEventListener('click', e => {
+    const b = e.target.closest('[data-conf]'); if (!b) return;
+    conf = b.dataset.conf;
+    document.querySelectorAll('#importFilters .chip-btn').forEach(x => x.classList.toggle('on', x === b));
+    renderPicks();
+  });
+  $('importClose').addEventListener('click', () => idlg.close());
+  $('importBtn').addEventListener('click', async () => {
+    selected.clear();
+    $('importList').innerHTML = '';
+    $('importMeta').textContent = "Loading today's picks…";
+    idlg.showModal();
+    try {
+      const meta = await loadPicks();
+      const when = meta && meta.upcoming_week ? `Week ${meta.upcoming_week} · ` : '';
+      const sample = meta && meta.odds_source === 'sample' ? ' <span class="warnbox">These use SAMPLE odds, not real sportsbook lines.</span>' : '';
+      $('importMeta').innerHTML = `${when}${picks.length} picks with a positive edge, best first. Tick the ones you bet.${sample}`;
+      renderPicks();
+    } catch (e) {
+      $('importMeta').innerHTML = `<span class="error">Couldn't load picks: ${esc(e.message)}.</span>`;
+    }
+  });
+
+  async function findNflPlayer(name, team) {
+    const nfl = leagueById('NFL');
+    const all = await teams(nfl);
+    const abbr = NFLVERSE_TO_ESPN_TEAM[team] || team;
+    // Their team first; then everyone else, in case of a recent trade.
+    const order = all.filter(t => t.abbreviation === abbr).concat(all.filter(t => t.abbreviation !== abbr));
+    for (const t of order) {
+      let list;
+      try { list = await roster(nfl, t.id); } catch (e) { continue; }
+      const a = list.find(x => nameKey(x.name) === nameKey(name));
+      if (a) return { team: t, athlete: a };
+    }
+    return null;
+  }
+  $('importGo').addEventListener('click', async () => {
+    const chosen = picks.filter(p => selected.has(p.id));
+    $('importGo').disabled = true;
+    $('importCount').textContent = 'Adding…';
+    const missed = [];
+    for (const pk of chosen) {
+      const found = await findNflPlayer(pk.raw.player_name, pk.raw.team).catch(() => null);
+      if (!found) { missed.push(pk.raw.player_name); continue; }
+      const { team: t, athlete: a } = found;
+      const key = `player:NFL:${a.id}`;
+      let it = items.find(x => keyOf(x) === key);
+      if (!it) {
+        it = { type: 'player', league: 'NFL', athleteId: a.id, name: a.name, teamId: t.id, teamAbbreviation: t.abbreviation,
+          position: a.position, jersey: a.jersey, headshot: a.headshot, props: [] };
+        items.push(it);
+      }
+      it.props = it.props || [];
+      if (!it.props.some(p => p.statId === pk.statId && p.line === pk.line && p.side === pk.side)) {
+        it.props.push({ statId: pk.statId, line: pk.line, side: pk.side });
+      }
+    }
+    changed();
+    selected.clear();
+    if (missed.length) {
+      $('importMeta').innerHTML = `<span class="warnbox">Added ${chosen.length - missed.length}. Couldn't find ${esc(missed.join(', '))} on an ESPN roster. Add them with + Add instead.</span>`;
+      renderPicks();
+    } else {
+      idlg.close();
+      renderStatus(`Added ${chosen.length} pick${chosen.length === 1 ? '' : 's'}. Tap Send to TV.`, 'dirty');
+    }
+  });
 
   // ---------- prop form ----------
   const pdlg = $('propDialog');

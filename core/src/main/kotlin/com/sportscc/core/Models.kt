@@ -135,3 +135,7 @@ internal fun parseStatValue(raw: String): Double? {
     val first = Regex("""^-?\d+(\.\d+)?""").find(s)?.value ?: return null
     return first.toDoubleOrNull()
 }
+
+/** The [part]-th number in a compound value: parseStatPart("18/27", 1) == 27.0. */
+internal fun parseStatPart(raw: String, part: Int): Double? =
+    Regex("""\d+(\.\d+)?""").findAll(raw).elementAtOrNull(part)?.value?.toDoubleOrNull()

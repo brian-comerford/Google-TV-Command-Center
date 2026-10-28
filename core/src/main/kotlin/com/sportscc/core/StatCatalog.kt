@@ -4,7 +4,13 @@ package com.sportscc.core
  * One box-score column. [labels] are alternatives (ESPN isn't always consistent, e.g. "SOG" vs "S"),
  * [category] null means "any category" (basketball/hockey box scores mostly have a single group).
  */
-data class StatComponent(val labels: List<String>, val category: String? = null, val weight: Double = 1.0)
+data class StatComponent(
+    val labels: List<String>,
+    val category: String? = null,
+    val weight: Double = 1.0,
+    /** Which number of a "made/attempted" value to read: 0 = first ("18" of "18/27"), 1 = second ("27"). */
+    val part: Int = 0,
+)
 
 /** A trackable number for props and fantasy: a weighted sum of box-score columns. */
 data class StatDef(val id: String, val name: String, val short: String, val components: List<StatComponent>) {
@@ -14,7 +20,9 @@ data class StatDef(val id: String, val name: String, val short: String, val comp
         var found = false
         var total = 0.0
         for (c in components) {
-            val v = c.labels.firstNotNullOfOrNull { label -> line.find(c.category, label)?.value } ?: continue
+            val v = c.labels.firstNotNullOfOrNull { label ->
+                line.find(c.category, label)?.let { if (c.part == 0) it.value else parseStatPart(it.raw, c.part) }
+            } ?: continue
             found = true
             total += v * c.weight
         }
@@ -26,8 +34,8 @@ data class StatDef(val id: String, val name: String, val short: String, val comp
 data class StatGroup(val category: String?, val title: String, val labels: List<String>)
 
 object StatCatalog {
-    private fun c(category: String?, vararg labels: String, weight: Double = 1.0) =
-        StatComponent(labels.toList(), category, weight)
+    private fun c(category: String?, vararg labels: String, weight: Double = 1.0, part: Int = 0) =
+        StatComponent(labels.toList(), category, weight, part)
 
     private fun def(id: String, name: String, short: String, vararg comps: StatComponent) =
         StatDef(id, name, short, comps.toList())
@@ -36,6 +44,7 @@ object StatCatalog {
         def("pass_yds", "Passing Yards", "Pass Yds", c("passing", "YDS")),
         def("pass_td", "Passing TDs", "Pass TD", c("passing", "TD")),
         def("pass_cmp", "Completions", "Cmp", c("passing", "C/ATT")),
+        def("pass_att", "Pass Attempts", "Pass Att", c("passing", "C/ATT", part = 1)),
         def("pass_int", "Interceptions Thrown", "INT", c("passing", "INT")),
         def("rush_yds", "Rushing Yards", "Rush Yds", c("rushing", "YDS")),
         def("rush_att", "Rush Attempts", "Carries", c("rushing", "CAR")),

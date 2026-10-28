@@ -74,6 +74,12 @@ GitHub Pages: `https://brian-comerford.github.io/Google-TV-Command-Center/`.
 3. Add teams and players, type your prop lines, and tap **Send to TV**. The TV picks up the new list
    within about 20 seconds (about 3 seconds while the Phone screen is open). It replaces the list on the TV.
 
+**Import picks** loads today's recommended bets from
+[Player Prop Finder](https://brian-comerford.github.io/Player-Prop-Finder/) (NFL), best edge first,
+filterable by confidence. Tick the ones you bet and they're added with their lines. That app uses
+nflverse player ids, so players are matched to ESPN rosters by name and team (checking every roster
+in case of a trade); anyone it can't match is listed so you can add them by hand.
+
 The phone and TV pass the list through [ntfy.sh](https://ntfy.sh), a free public message relay, on a
 channel named after the TV's code. There are no accounts. Anyone who knew your code could send your TV
 a list, so **New code** on the TV's Phone screen unlinks every phone. Messages are only kept on the
