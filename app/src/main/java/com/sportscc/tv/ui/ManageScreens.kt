@@ -213,6 +213,13 @@ fun SettingsScreen(
         }
         Hint("ESPN's feed itself updates every ~15–30s, so going lower mostly costs bandwidth.")
 
+        SectionLabel("Card layout on the home screen")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FocusButton("2 columns", { onChange { it.copy(cardColumns = 2) } }, selected = settings.cardColumns == 2)
+            FocusButton("1 wide column", { onChange { it.copy(cardColumns = 1) } }, selected = settings.cardColumns == 1)
+        }
+        Hint("2 columns fits more cards on screen; 1 wide column gives each card more room.")
+
         SectionLabel("Card order on the home screen")
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FocusButton("My order", { onChange { it.copy(liveFirst = false) } }, selected = !settings.liveFirst)

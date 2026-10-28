@@ -153,6 +153,7 @@ class MainActivity : ComponentActivity() {
                 feed = feed,
                 banner = banner,
                 liveFirst = settings.liveFirst,
+                columns = settings.cardColumns,
                 focusKey = focusKey,
                 movingKey = movingKey,
                 onAdd = { push(Screen.Leagues) },

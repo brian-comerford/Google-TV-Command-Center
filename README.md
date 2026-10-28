@@ -66,7 +66,7 @@ should pop up over it about 6 seconds later.
 - **Select a card** to edit its props, move it, move it to the top, or stop following it.
 - **Move a card**: select it, choose **Move**, then use the arrows to slide it around the grid. Press
   OK to place it, or Back to cancel. On the phone site, use the ↑ ↓ buttons on each item.
-- **Settings**: refresh rate during live games (10–60 s), card order (**My order** keeps cards where
+- **Settings**: refresh rate during live games (10–60 s), card layout (**2 columns** or **1 wide column**), card order (**My order** keeps cards where
   you put them; **Live games first** lifts live games to the top), every update or big plays only,
   and background alerts on or off.
 

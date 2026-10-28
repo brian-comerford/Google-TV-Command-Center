@@ -20,6 +20,8 @@ data class AppSettings(
     val backgroundAlerts: Boolean = true,
     /** Sort live games to the top; off keeps cards exactly where the user put them. */
     val liveFirst: Boolean = false,
+    /** Home-screen card columns: 2 side by side, or 1 wide column. */
+    val cardColumns: Int = 2,
 )
 
 /** Watchlist + settings, persisted as JSON in SharedPreferences. */

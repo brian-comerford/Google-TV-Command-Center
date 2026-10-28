@@ -86,6 +86,8 @@ fun DashboardScreen(
     feed: List<Alert>,
     banner: Alert?,
     liveFirst: Boolean,
+    /** 1 or 2 card columns (Settings). Fixed, so it doesn't depend on the TV's screen density. */
+    columns: Int,
     /** Card to focus when the screen opens (the one you last selected), else the first. */
     focusKey: String?,
     /** Card being moved with the arrows, or null. */
@@ -165,7 +167,7 @@ fun DashboardScreen(
                         dashboard == null -> Text("Loading scores…", color = Palette.Muted, fontSize = 18.sp)
                         shown.isEmpty() -> EmptyState()
                         else -> LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 300.dp),
+                            columns = GridCells.Fixed(columns.coerceIn(1, 2)),
                             state = gridState,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp),
