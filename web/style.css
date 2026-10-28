@@ -69,6 +69,8 @@ input.code { font-family: var(--mono); font-size: 20px; letter-spacing: .12em; t
 .pic.logo { border-radius: 0; background: transparent; object-fit: contain; }
 .league { font-size: 11px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); padding: 2px 7px; border-radius: 6px; }
 .x { background: none; border: 0; color: var(--muted); font-size: 22px; line-height: 1; padding: 6px 8px; cursor: pointer; }
+.x.mv { font-size: 18px; color: var(--accent); padding: 6px 7px; }
+.x:disabled { opacity: .25; cursor: default; }
 .props { display: flex; flex-wrap: wrap; gap: 6px; }
 .prop { display: inline-flex; align-items: center; gap: 4px; background: var(--panel-hi); border-radius: 8px; padding: 4px 4px 4px 10px; font-size: 14px; }
 .prop b { color: var(--win); } .prop.under b { color: var(--warn); }

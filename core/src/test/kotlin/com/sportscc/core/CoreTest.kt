@@ -204,3 +204,29 @@ class TrackerTest {
         assertFalse(q.single().big)
     }
 }
+
+class OrderTest {
+    private fun card(key: String, state: GameState?): Card {
+        val g = state?.let {
+            val c = Competitor(key, key, key, key, null, null, 0, null, true)
+            Game("g$key", League.NBA, "", it, "", "", 1, "", c, c.copy(isHome = false))
+        }
+        return TeamCard(TeamWatch(League.NBA, key, key, key), g)
+    }
+
+    @Test
+    fun myOrderKeepsWatchlistOrderAndLiveFirstGroups() {
+        val cards = listOf(card("a", GameState.POST), card("b", null), card("c", GameState.IN), card("d", GameState.PRE), card("e", GameState.IN))
+        assertEquals(listOf("a", "b", "c", "d", "e"), orderCards(cards, liveFirst = false).map { (it.watch as TeamWatch).teamId })
+        assertEquals(listOf("c", "e", "d", "a", "b"), orderCards(cards, liveFirst = true).map { (it.watch as TeamWatch).teamId })
+    }
+
+    @Test
+    fun movesItems() {
+        val l = listOf(1, 2, 3, 4, 5)
+        assertEquals(listOf(2, 1, 3, 4, 5), l.moved(0, 1))
+        assertEquals(listOf(1, 2, 4, 5, 3), l.moved(2, 2)) // down one row in a 2-column grid
+        assertEquals(listOf(5, 1, 2, 3, 4), l.moved(4, -10)) // clamped to the start
+        assertEquals(l, l.moved(0, -1))
+    }
+}

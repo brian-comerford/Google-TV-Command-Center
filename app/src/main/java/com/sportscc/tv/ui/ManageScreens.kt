@@ -136,6 +136,7 @@ private fun LineEditor(def: StatDef, onCancel: () -> Unit, onSave: (Double, Prop
 fun ManageScreen(
     item: WatchItem,
     onEditProps: (() -> Unit)?,
+    onMove: () -> Unit,
     onMoveTop: () -> Unit,
     onRemove: () -> Unit,
     onBack: () -> Unit,
@@ -146,10 +147,11 @@ fun ManageScreen(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (onEditProps != null) {
                 FocusButton("Edit props / bet lines", onEditProps, Modifier.focusRequester(first), big = true)
-                FocusButton("Move to top", onMoveTop, big = true)
+                FocusButton("Move (use the arrows)", onMove, big = true)
             } else {
-                FocusButton("Move to top", onMoveTop, Modifier.focusRequester(first), big = true)
+                FocusButton("Move (use the arrows)", onMove, Modifier.focusRequester(first), big = true)
             }
+            FocusButton("Move to top", onMoveTop, big = true)
             FocusButton("Stop following", onRemove, accent = Palette.Live, big = true)
             FocusButton("Back", onBack, big = true)
         }
@@ -179,6 +181,13 @@ fun SettingsScreen(
             }
         }
         Hint("ESPN's feed itself updates every ~15–30s, so going lower mostly costs bandwidth.")
+
+        SectionLabel("Card order on the home screen")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FocusButton("My order", { onChange { it.copy(liveFirst = false) } }, selected = !settings.liveFirst)
+            FocusButton("Live games first", { onChange { it.copy(liveFirst = true) } }, selected = settings.liveFirst)
+        }
+        Hint("My order keeps cards where you put them (select a card, then Move). Live games first moves live games to the top on its own.")
 
         SectionLabel("Pop-up alerts")
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

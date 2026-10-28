@@ -23,6 +23,7 @@ import com.sportscc.core.League
 import com.sportscc.core.PlayerWatch
 import com.sportscc.core.TeamInfo
 import com.sportscc.core.TeamWatch
+import com.sportscc.core.orderCards
 import com.sportscc.tv.ui.DashboardScreen
 import com.sportscc.tv.ui.LeaguePickerScreen
 import com.sportscc.tv.ui.ManageScreen
@@ -114,6 +115,14 @@ class MainActivity : ComponentActivity() {
         }
         BackHandler(enabled = stack.size > 1) { pop() }
 
+        // Home-screen state that outlives a trip to another screen.
+        var focusKey by remember { mutableStateOf<String?>(null) }
+        var movingKey by remember { mutableStateOf<String?>(null) }
+        val cards = remember(dashboard, watchlist, settings.liveFirst) {
+            val byKey = dashboard?.cards.orEmpty().associateBy { it.watch.key }
+            orderCards(watchlist.mapNotNull { byKey[it.key] }, settings.liveFirst)
+        }
+
         // In-app banner: show popups one at a time.
         var banner by remember { mutableStateOf<Alert?>(null) }
         LaunchedEffect(Unit) {
@@ -130,13 +139,25 @@ class MainActivity : ComponentActivity() {
         when (val screen = stack.last()) {
             Screen.Home -> DashboardScreen(
                 dashboard = dashboard,
+                cards = cards,
                 feed = feed,
                 banner = banner,
+                liveFirst = settings.liveFirst,
+                focusKey = focusKey,
+                movingKey = movingKey,
                 onAdd = { push(Screen.Leagues) },
                 onPhone = { push(Screen.Phone) },
                 onRefresh = { engine.refreshNow() },
                 onSettings = { push(Screen.Settings) },
-                onCardClick = { push(Screen.Manage(it.watch.key)) },
+                onCardClick = {
+                    focusKey = it.watch.key
+                    push(Screen.Manage(it.watch.key))
+                },
+                onMoveDone = { order ->
+                    store.reorder(order)
+                    movingKey = null
+                },
+                onMoveCancel = { movingKey = null },
             )
 
             Screen.Leagues -> LeaguePickerScreen { push(Screen.Teams(it)) }
@@ -198,6 +219,10 @@ class MainActivity : ComponentActivity() {
                 if (item == null) LaunchedEffect(Unit) { home() } else ManageScreen(
                     item,
                     onEditProps = if (item is PlayerWatch) ({ stack[stack.lastIndex] = Screen.Props(item.key) }) else null,
+                    onMove = {
+                        movingKey = item.key
+                        home()
+                    },
                     onMoveTop = { store.moveToTop(item.key); home() },
                     onRemove = { store.remove(item.key); home() },
                     onBack = { pop() },

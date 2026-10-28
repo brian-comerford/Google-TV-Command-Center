@@ -57,9 +57,12 @@ should pop up over it about 6 seconds later.
   After you pick a player, you can add prop lines: choose the stat, set the line with the ± buttons,
   and choose Over or Under.
 - **Phone**: link your phone and edit the list there (see below).
-- **Select a card** to edit its props, move it to the top, or stop following it.
-- **Settings**: refresh rate during live games (10–60 s), every update or big plays only, and
-  background alerts on or off.
+- **Select a card** to edit its props, move it, move it to the top, or stop following it.
+- **Move a card**: select it, choose **Move**, then use the arrows to slide it around the grid. Press
+  OK to place it, or Back to cancel. On the phone site, use the ↑ ↓ buttons on each item.
+- **Settings**: refresh rate during live games (10–60 s), card order (**My order** keeps cards where
+  you put them; **Live games first** lifts live games to the top), every update or big plays only,
+  and background alerts on or off.
 
 ## Phone remote (edit your list on your phone)
 Typing is easier on a phone, so you can build your list on the website in `web/`, which is hosted on

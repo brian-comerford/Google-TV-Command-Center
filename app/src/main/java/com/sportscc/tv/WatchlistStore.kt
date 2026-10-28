@@ -18,6 +18,8 @@ data class AppSettings(
     val bigPlaysOnly: Boolean = false,
     /** Keep polling and pop alerts over other apps (needs "display over other apps"). */
     val backgroundAlerts: Boolean = true,
+    /** Sort live games to the top; off keeps cards exactly where the user put them. */
+    val liveFirst: Boolean = false,
 )
 
 /** Watchlist + settings, persisted as JSON in SharedPreferences. */
@@ -54,6 +56,12 @@ class WatchlistStore(context: Context) {
     fun replaceAll(items: List<WatchItem>) = saveWatchlist(items.distinctBy { it.key })
 
     fun remove(key: String) = saveWatchlist(_watchlist.value.filterNot { it.key == key })
+
+    /** Puts the list in the order of [keys]; anything not named keeps its relative order at the end. */
+    fun reorder(keys: List<String>) {
+        val rank = keys.withIndex().associate { (i, k) -> k to i }
+        saveWatchlist(_watchlist.value.sortedBy { rank[it.key] ?: Int.MAX_VALUE })
+    }
 
     fun moveToTop(key: String) {
         val item = find(key) ?: return

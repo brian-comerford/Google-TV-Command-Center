@@ -28,6 +28,7 @@ data class PlayerCard(
 ) : Card
 
 data class Dashboard(
+    /** In watchlist order; see [orderCards] for the on-screen order. */
     val cards: List<Card>,
     val anyLive: Boolean,
     val updatedAt: Long,
@@ -114,16 +115,29 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
                     }
                 }
             }
-            // Live games first, then upcoming, then finished / no game; keep the user's order within each.
-            val order = cards.sortedBy {
-                when (it.game?.state) {
-                    GameState.IN -> 0
-                    GameState.PRE -> 1
-                    GameState.POST -> 2
-                    null -> 3
-                }
-            }
-            return Dashboard(order, cards.any { it.game?.state == GameState.IN }, now, errors)
+            return Dashboard(cards, cards.any { it.game?.state == GameState.IN }, now, errors)
         }
     }
+}
+
+/**
+ * On-screen order. With [liveFirst], live games come first, then upcoming, then finished / no game,
+ * keeping the user's order within each group; otherwise the user's order as-is.
+ */
+fun orderCards(cards: List<Card>, liveFirst: Boolean): List<Card> =
+    if (!liveFirst) cards else cards.sortedBy {
+        when (it.game?.state) {
+            GameState.IN -> 0
+            GameState.PRE -> 1
+            GameState.POST -> 2
+            null -> 3
+        }
+    }
+
+/** Moves the item at [from] by [delta] places (clamped), e.g. -1 = left, +columns = down a row. */
+fun <T> List<T>.moved(from: Int, delta: Int): List<T> {
+    if (from !in indices) return this
+    val to = (from + delta).coerceIn(0, lastIndex)
+    if (to == from) return this
+    return toMutableList().apply { add(to, removeAt(from)) }
 }

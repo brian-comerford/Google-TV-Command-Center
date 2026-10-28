@@ -118,20 +118,25 @@
   function pic(src, isLogo) {
     return src ? `<img class="pic${isLogo ? ' logo' : ''}" src="${esc(src)}" alt="" loading="lazy">` : `<div class="pic"></div>`;
   }
+  // The TV shows cards in this order (with "My order"; "Live games first" still lifts live games).
+  function moveBtns(i) {
+    return `<button class="x mv" data-move="${i}:-1" aria-label="Move up"${i === 0 ? ' disabled' : ''}>↑</button>` +
+      `<button class="x mv" data-move="${i}:1" aria-label="Move down"${i === items.length - 1 ? ' disabled' : ''}>↓</button>`;
+  }
   function render() {
     $('list').innerHTML = items.map((it, i) => {
       const league = leagueById(it.league);
       if (it.type === 'team') {
         return `<div class="item"><div class="item-head">${pic(it.logo, true)}
           <div class="who"><div class="name">${esc(it.name)}</div><div class="sub"><span class="league">${esc(league.label)}</span> Team · scores &amp; scoring alerts</div></div>
-          <button class="x" data-remove="${i}" aria-label="Remove ${esc(it.name)}">×</button></div></div>`;
+          ${moveBtns(i)}<button class="x" data-remove="${i}" aria-label="Remove ${esc(it.name)}">×</button></div></div>`;
       }
       const props = (it.props || []).map((p, j) =>
         `<span class="prop${p.side === 'UNDER' ? ' under' : ''}"><b>${p.side === 'UNDER' ? 'U' : 'O'} ${num(p.line)}</b> ${esc(statShort(it.league, p.statId))}
           <button class="x" data-unprop="${i}:${j}" aria-label="Remove prop">×</button></span>`).join('');
       return `<div class="item"><div class="item-head">${pic(it.headshot)}
           <div class="who"><div class="name">${esc(it.name)}</div><div class="sub"><span class="league">${esc(league.label)}</span> ${esc([it.teamAbbreviation, it.position, it.jersey ? '#' + it.jersey : null].filter(Boolean).join(' · '))}</div></div>
-          <button class="x" data-remove="${i}" aria-label="Remove ${esc(it.name)}">×</button></div>
+          ${moveBtns(i)}<button class="x" data-remove="${i}" aria-label="Remove ${esc(it.name)}">×</button></div>
         <div class="props">${props}<button class="addprop" data-addprop="${i}" type="button">+ Prop</button></div></div>`;
     }).join('');
     renderStatus();
@@ -147,6 +152,15 @@
   $('list').addEventListener('click', e => {
     const t = e.target.closest('button'); if (!t) return;
     if (t.dataset.remove) { items.splice(+t.dataset.remove, 1); changed(); }
+    else if (t.dataset.move) {
+      const [i, d] = t.dataset.move.split(':').map(Number);
+      const j = i + d;
+      if (j < 0 || j >= items.length) return;
+      [items[i], items[j]] = [items[j], items[i]];
+      changed();
+      const again = document.querySelector(`[data-move="${j}:${d}"]`) || document.querySelector(`[data-move="${j}:${-d}"]`);
+      if (again) again.focus();
+    }
     else if (t.dataset.unprop) { const [i, j] = t.dataset.unprop.split(':').map(Number); items[i].props.splice(j, 1); changed(); }
     else if (t.dataset.addprop) openProp(+t.dataset.addprop);
   });

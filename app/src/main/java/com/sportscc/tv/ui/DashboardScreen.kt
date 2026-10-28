@@ -2,6 +2,18 @@
 
 package com.sportscc.tv.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import com.sportscc.core.moved
+import kotlinx.coroutines.launch
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,7 +40,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,17 +81,37 @@ import java.util.Date
 @Composable
 fun DashboardScreen(
     dashboard: Dashboard?,
+    /** Already in on-screen order (see orderCards). */
+    cards: List<Card>,
     feed: List<Alert>,
     banner: Alert?,
+    liveFirst: Boolean,
+    /** Card to focus when the screen opens (the one you last selected), else the first. */
+    focusKey: String?,
+    /** Card being moved with the arrows, or null. */
+    movingKey: String?,
     onAdd: () -> Unit,
     onPhone: () -> Unit,
     onRefresh: () -> Unit,
     onSettings: () -> Unit,
     onCardClick: (Card) -> Unit,
+    onMoveDone: (List<String>) -> Unit,
+    onMoveCancel: () -> Unit,
 ) {
     val addFocus = remember { FocusRequester() }
-    val firstCardFocus = remember { FocusRequester() }
+    val requesters = remember { mutableMapOf<String, FocusRequester>() }
+    fun requester(key: String) = requesters.getOrPut(key) { FocusRequester() }
     var initialFocusDone by remember { mutableStateOf(false) }
+    val gridState = rememberLazyGridState()
+    val scope = rememberCoroutineScope()
+
+    // While moving, the grid shows this working order; it's saved on OK and dropped on Back.
+    var moveOrder by remember(movingKey) { mutableStateOf(movingKey?.let { cards.map { c -> c.watch.key } }) }
+    val byKey = cards.associateBy { it.watch.key }
+    val shown = moveOrder?.mapNotNull { byKey[it] } ?: cards
+    val movingName = movingKey?.let { byKey[it]?.watch?.displayName }
+
+    BackHandler(enabled = movingKey != null) { onMoveCancel() }
 
     Box(Modifier.fillMaxSize().background(Palette.Bg)) {
         Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 20.dp)) {
@@ -88,7 +119,7 @@ fun DashboardScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("SPORTS COMMAND CENTER", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Palette.Text, letterSpacing = 1.5.sp)
-                    StatusLine(dashboard)
+                    if (movingName != null) MoveHint(movingName, liveFirst) else StatusLine(dashboard)
                 }
                 FocusButton("+ Add", onAdd, Modifier.focusRequester(addFocus).padding(start = 8.dp))
                 FocusButton("Phone", onPhone, Modifier.padding(start = 8.dp))
@@ -98,22 +129,54 @@ fun DashboardScreen(
             Spacer(Modifier.height(14.dp))
 
             Row(Modifier.weight(1f)) {
-                val cards = dashboard?.cards.orEmpty()
-                Box(Modifier.weight(1f).fillMaxHeight()) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .onPreviewKeyEvent { e ->
+                            val key = movingKey ?: return@onPreviewKeyEvent false
+                            val order = moveOrder ?: return@onPreviewKeyEvent false
+                            val columns = (gridState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.column } ?: 0) + 1
+                            val delta = when (e.key) {
+                                Key.DirectionLeft -> -1
+                                Key.DirectionRight -> 1
+                                Key.DirectionUp -> -columns
+                                Key.DirectionDown -> columns
+                                else -> null
+                            }
+                            when {
+                                delta != null -> {
+                                    if (e.type == KeyEventType.KeyDown) {
+                                        val next = order.moved(order.indexOf(key), delta)
+                                        moveOrder = next
+                                        scope.launch { gridState.revealItem(next.indexOf(key)) }
+                                    }
+                                    true
+                                }
+                                e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter -> {
+                                    if (e.type == KeyEventType.KeyUp) onMoveDone(order)
+                                    true
+                                }
+                                else -> false
+                            }
+                        },
+                ) {
                     when {
                         dashboard == null -> Text("Loading scores…", color = Palette.Muted, fontSize = 18.sp)
-                        cards.isEmpty() -> EmptyState()
+                        shown.isEmpty() -> EmptyState()
                         else -> LazyVerticalGrid(
                             columns = GridCells.Adaptive(minSize = 300.dp),
+                            state = gridState,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                             contentPadding = PaddingValues(6.dp),
                         ) {
-                            itemsIndexed(cards, key = { _, c -> c.watch.key }) { i, card ->
-                                val mod = if (i == 0) Modifier.focusRequester(firstCardFocus) else Modifier
+                            items(shown, key = { it.watch.key }) { card ->
+                                val mod = Modifier.focusRequester(requester(card.watch.key))
+                                val moving = card.watch.key == movingKey
                                 when (card) {
-                                    is TeamCard -> TeamCardView(card, mod) { onCardClick(card) }
-                                    is PlayerCard -> PlayerCardView(card, mod) { onCardClick(card) }
+                                    is TeamCard -> TeamCardView(card, mod, moving) { onCardClick(card) }
+                                    is PlayerCard -> PlayerCardView(card, mod, moving) { onCardClick(card) }
                                 }
                             }
                         }
@@ -127,9 +190,38 @@ fun DashboardScreen(
         AlertBanner(banner, Modifier.align(Alignment.TopCenter).padding(top = 18.dp))
     }
 
-    LaunchedEffect(dashboard != null, dashboard?.cards?.isEmpty()) {
+    LaunchedEffect(dashboard != null, shown.isEmpty()) {
         if (initialFocusDone || dashboard == null) return@LaunchedEffect
-        initialFocusDone = (if (dashboard.cards.isEmpty()) addFocus else firstCardFocus).requestFocusWhenReady()
+        if (shown.isEmpty()) {
+            initialFocusDone = addFocus.requestFocusWhenReady()
+            return@LaunchedEffect
+        }
+        val target = (movingKey ?: focusKey)?.takeIf { k -> shown.any { it.watch.key == k } } ?: shown.first().watch.key
+        gridState.revealItem(shown.indexOfFirst { it.watch.key == target })
+        initialFocusDone = requester(target).requestFocusWhenReady()
+    }
+}
+
+/** Scrolls just enough to bring [index] into view; no-op when it's already fully visible. */
+private suspend fun LazyGridState.revealItem(index: Int) {
+    if (index < 0) return
+    val info = layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index }
+    val fullyVisible = item != null && item.offset.y >= info.viewportStartOffset &&
+        item.offset.y + item.size.height <= info.viewportEndOffset
+    if (!fullyVisible) animateScrollToItem(index)
+}
+
+@Composable
+private fun MoveHint(name: String, liveFirst: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Pill("MOVING", Palette.Warn)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "$name · arrows to move · OK to place · Back to cancel" +
+                if (liveFirst) " · Live games first is on, so live games stay on top" else "",
+            fontSize = 12.sp, color = Palette.Warn, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -164,9 +256,9 @@ private fun EmptyState() {
 // ---------------- cards ----------------
 
 @Composable
-private fun TeamCardView(card: TeamCard, modifier: Modifier, onClick: () -> Unit) {
+private fun TeamCardView(card: TeamCard, modifier: Modifier, moving: Boolean, onClick: () -> Unit) {
     val g = card.game
-    TileCard(onClick, modifier.fillMaxWidth(), highlight = if (g?.state == GameState.IN) Palette.Live.copy(alpha = 0.6f) else null) {
+    TileCard(onClick, modifier.fillMaxWidth(), highlight = cardHighlight(g, moving)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Pill(card.watch.league.label, Palette.Accent, filled = false)
             Spacer(Modifier.weight(1f))
@@ -197,6 +289,12 @@ private fun TeamCardView(card: TeamCard, modifier: Modifier, onClick: () -> Unit
     }
 }
 
+private fun cardHighlight(g: Game?, moving: Boolean): Color? = when {
+    moving -> Palette.Warn
+    g?.state == GameState.IN -> Palette.Live.copy(alpha = 0.6f)
+    else -> null
+}
+
 @Composable
 private fun CompetitorRow(g: Game, c: Competitor, watched: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -223,10 +321,10 @@ private fun CompetitorRow(g: Game, c: Competitor, watched: Boolean) {
 }
 
 @Composable
-private fun PlayerCardView(card: PlayerCard, modifier: Modifier, onClick: () -> Unit) {
+private fun PlayerCardView(card: PlayerCard, modifier: Modifier, moving: Boolean, onClick: () -> Unit) {
     val w = card.watch
     val g = card.game
-    TileCard(onClick, modifier.fillMaxWidth(), highlight = if (g?.state == GameState.IN) Palette.Live.copy(alpha = 0.6f) else null) {
+    TileCard(onClick, modifier.fillMaxWidth(), highlight = cardHighlight(g, moving)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
                 model = w.headshot,
