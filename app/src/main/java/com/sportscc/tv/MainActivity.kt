@@ -1,6 +1,8 @@
 package com.sportscc.tv
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -78,6 +80,12 @@ class MainActivity : ComponentActivity() {
 
     private fun syncService() {
         if (scc.store.settings.value.backgroundAlerts) AlertService.start(this) else AlertService.stop(this)
+    }
+
+    private fun copyToClipboard(text: String) {
+        val cm = getSystemService(ClipboardManager::class.java)
+        cm?.setPrimaryClip(ClipData.newPlainText("Sports Command Center download link", text))
+        Toast.makeText(this, "Link copied. Long-press the URL box in Downloader to paste.", Toast.LENGTH_LONG).show()
     }
 
     private fun requestOverlay() {
@@ -241,6 +249,9 @@ class MainActivity : ComponentActivity() {
             }
 
             Screen.Settings -> SettingsScreen(
+                appVersion = BuildConfig.VERSION_NAME,
+                apkUrl = BuildConfig.APK_URL,
+                onCopyApkUrl = { copyToClipboard(BuildConfig.APK_URL) },
                 settings = settings,
                 overlayAllowed = overlayAllowed.value,
                 onChange = { t ->

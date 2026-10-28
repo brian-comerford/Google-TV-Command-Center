@@ -16,6 +16,25 @@
   </header>
 
   <main>
+    <!-- Install / update the TV app -->
+    <details class="card install" id="installCard">
+      <summary><div><h2>Install or update the TV app</h2><span class="muted small" id="latestVersion"></span></div></summary>
+      <ol class="steps">
+        <li>On the TV, open the <b>Downloader</b> app and select the URL box.</li>
+        <li>Copy this link:
+          <div class="copyrow">
+            <label for="apkUrl" class="sr">Download link</label>
+            <input id="apkUrl" readonly value="https://github.com/brian-comerford/Google-TV-Command-Center/releases/latest/download/SportsCommandCenter.apk">
+            <button class="btn primary" id="copyApk" type="button">Copy</button>
+          </div>
+          <span class="muted small" id="copyStatus"></span>
+        </li>
+        <li>On this phone, open the <b>Google TV</b> app, tap <b>Remote</b>, then the <b>keyboard</b> icon, and paste the link. Press <b>Go</b> in Downloader.</li>
+        <li>Choose <b>Install</b>. Installing over an older version keeps your list.</li>
+      </ol>
+      <p class="muted small">Downloader blocked? When the TV says it can't install apps from this source, choose <b>Settings</b> on that message and turn Downloader on.</p>
+    </details>
+
     <!-- Link to a TV -->
     <section class="card" id="linkCard">
       <div id="linkForm">

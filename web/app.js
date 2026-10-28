@@ -441,9 +441,27 @@
     pdlg.close(); changed();
   });
 
+  // ---------- install / update card ----------
+  $('copyApk').addEventListener('click', async () => {
+    const input = $('apkUrl');
+    try {
+      await navigator.clipboard.writeText(input.value);
+      $('copyStatus').textContent = 'Copied. Now paste it with the Google TV app keyboard.';
+    } catch (e) {
+      input.focus(); input.select(); input.setSelectionRange(0, input.value.length);
+      $('copyStatus').textContent = 'Press and hold the selected link, then tap Copy.';
+    }
+  });
+  fetch('https://api.github.com/repos/brian-comerford/Google-TV-Command-Center/releases/latest')
+    .then(r => r.ok ? r.json() : null)
+    .then(rel => { if (rel && rel.tag_name) $('latestVersion').textContent = 'Latest: ' + rel.tag_name; })
+    .catch(() => { /* version label is optional */ });
+
   // ---------- start ----------
   const fromUrl = new URLSearchParams(location.search).get('tv');
   if (fromUrl && normalize(fromUrl).length === 8 && normalize(fromUrl) !== code) link(fromUrl);
   else if (fromUrl) $('codeInput').value = pretty(fromUrl);
+  // Open the install steps until a TV has been linked (you need the app before you can link).
+  $('installCard').open = !code;
   render(); renderLink();
 })();

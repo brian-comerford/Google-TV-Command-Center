@@ -165,6 +165,9 @@ fun SettingsScreen(
     onChange: ((AppSettings) -> AppSettings) -> Unit,
     onRequestOverlay: () -> Unit,
     onTestAlert: () -> Unit,
+    appVersion: String,
+    apkUrl: String,
+    onCopyApkUrl: () -> Unit,
 ) = ScreenFrame {
     Column(Modifier.verticalScroll(rememberScrollState())) {
         ScreenTitle("Settings")
@@ -218,6 +221,17 @@ fun SettingsScreen(
         Spacer(Modifier.height(12.dp))
         FocusButton("Send a test alert", onTestAlert)
         Hint("Fires 6 seconds after you press it: press Home and open another app to see it pop up on top.")
+
+        SectionLabel("Install or update the app")
+        Text("You have version $appVersion. To get the newest one, open Downloader and enter:", fontSize = 14.sp, color = Palette.Text)
+        Spacer(Modifier.height(6.dp))
+        Text(apkUrl, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Palette.Accent)
+        Spacer(Modifier.height(8.dp))
+        FocusButton("Copy link", onCopyApkUrl)
+        Hint(
+            "Easiest: copy it from the phone website (Install or update the TV app), then paste it into Downloader " +
+                "with the keyboard in the Google TV app on your phone. Installing over this version keeps your list.",
+        )
 
         SectionLabel("About")
         Hint(

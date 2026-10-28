@@ -21,6 +21,11 @@ android {
         // GitHub Pages address of the phone website in web/ (owner.github.io/repo/).
         val repo = (System.getenv("GITHUB_REPOSITORY") ?: "brian-comerford/Google-TV-Command-Center").split("/")
         buildConfigField("String", "REMOTE_URL", "\"https://${repo[0].lowercase()}.github.io/${repo[1]}/\"")
+        // Always points at the newest build (see .github/workflows/build-apk.yml).
+        buildConfigField(
+            "String", "APK_URL",
+            "\"https://github.com/${repo[0]}/${repo[1]}/releases/latest/download/SportsCommandCenter.apk\"",
+        )
     }
 
     signingConfigs {

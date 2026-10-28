@@ -33,6 +33,10 @@ to the run and also published as a GitHub Release.
    (This link only works if the repository is public. If it's private, use option 2b.)
 5. Install the APK. **Sports Command Center** then shows up in your apps row.
 
+Typing that link with the remote is slow. Instead, open the phone website (below), expand
+**Install or update the TV app** and tap **Copy**. Then paste the link into Downloader with the keyboard in
+the Google TV app on your phone. The TV app's **Settings** also shows the link and your installed version.
+
 ### 2b. With a computer (ADB)
 1. Turn on developer mode as in step 1 above. Then go to **Settings → System → Developer options** and
    turn on **USB debugging** (on Google TV this also allows network ADB).
