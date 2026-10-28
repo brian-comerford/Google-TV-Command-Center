@@ -17,6 +17,10 @@ android {
         targetSdk = 34
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionName = "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
+
+        // GitHub Pages address of the phone website in web/ (owner.github.io/repo/).
+        val repo = (System.getenv("GITHUB_REPOSITORY") ?: "brian-comerford/Google-TV-Command-Center").split("/")
+        buildConfigField("String", "REMOTE_URL", "\"https://${repo[0].lowercase()}.github.io/${repo[1]}/\"")
     }
 
     signingConfigs {
@@ -47,6 +51,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -68,4 +73,5 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.google.zxing:core:3.5.3")
 }

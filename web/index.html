@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0F17">
+  <title>Sports Command Center Remote</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Roboto+Mono:wght@700&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">SPORTS COMMAND CENTER</div>
+    <div class="tag">Phone remote</div>
+  </header>
+
+  <main>
+    <!-- Link to a TV -->
+    <section class="card" id="linkCard">
+      <div id="linkForm">
+        <h2>Link your TV</h2>
+        <p class="muted">On the TV, open Sports Command Center and press <b>Phone</b>. Enter the code it shows.</p>
+        <form id="codeForm" class="row" autocomplete="off">
+          <label for="codeInput" class="sr">TV code</label>
+          <input id="codeInput" class="code" placeholder="ABCD-EFGH" maxlength="9" autocapitalize="characters" spellcheck="false" required>
+          <button class="btn primary" type="submit">Link</button>
+        </form>
+        <p class="error" id="codeError" hidden></p>
+      </div>
+      <div id="linked" hidden>
+        <div class="row between">
+          <div>
+            <div class="muted small">Linked to TV</div>
+            <div class="code-display" id="codeDisplay"></div>
+          </div>
+          <button class="btn ghost" id="unlinkBtn" type="button">Change</button>
+        </div>
+        <button class="btn ghost full" id="loadTvBtn" type="button">Load the list that's on the TV</button>
+        <p class="muted small" id="loadStatus" hidden></p>
+      </div>
+    </section>
+
+    <!-- The list -->
+    <section>
+      <div class="row between section-head">
+        <h2>Your list</h2>
+        <button class="btn primary" id="addBtn" type="button">+ Add</button>
+      </div>
+      <div id="list"></div>
+      <div class="empty" id="empty">
+        <p><b>Nothing here yet.</b></p>
+        <p class="muted">Add the teams you're rooting for and the players you have bets or fantasy stakes on. Give each player your prop lines, then send everything to the TV.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Send bar -->
+  <footer class="sendbar">
+    <div class="sendstatus" id="sendStatus">Not sent yet</div>
+    <button class="btn send" id="sendBtn" type="button">Send to TV</button>
+  </footer>
+
+  <!-- Add flow -->
+  <dialog id="addDialog">
+    <div class="sheet">
+      <div class="row between">
+        <button class="btn ghost" id="addBack" type="button">‹ Back</button>
+        <h3 id="addTitle">Pick a league</h3>
+        <button class="btn ghost" id="addClose" type="button">Close</button>
+      </div>
+      <div id="addSearchWrap" hidden>
+        <label for="addSearch" class="sr">Search</label>
+        <input id="addSearch" type="search" placeholder="Search" autocomplete="off">
+      </div>
+      <div id="addBody" class="picker"></div>
+    </div>
+  </dialog>
+
+  <!-- Prop form -->
+  <dialog id="propDialog">
+    <form class="sheet" id="propForm">
+      <h3 id="propTitle">Add a prop</h3>
+      <label for="propStat">Stat</label>
+      <select id="propStat"></select>
+      <label for="propLine">Line</label>
+      <input id="propLine" type="number" inputmode="decimal" step="0.5" min="0" value="0.5" required>
+      <div class="seg" role="radiogroup" aria-label="Over or under">
+        <input type="radio" name="side" id="sideOver" value="OVER" checked><label for="sideOver">Over</label>
+        <input type="radio" name="side" id="sideUnder" value="UNDER"><label for="sideUnder">Under</label>
+      </div>
+      <div class="row end">
+        <button class="btn ghost" type="button" id="propCancel">Cancel</button>
+        <button class="btn primary" type="submit">Add prop</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

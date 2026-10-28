@@ -73,6 +73,7 @@ fun DashboardScreen(
     feed: List<Alert>,
     banner: Alert?,
     onAdd: () -> Unit,
+    onPhone: () -> Unit,
     onRefresh: () -> Unit,
     onSettings: () -> Unit,
     onCardClick: (Card) -> Unit,
@@ -90,6 +91,7 @@ fun DashboardScreen(
                     StatusLine(dashboard)
                 }
                 FocusButton("+ Add", onAdd, Modifier.focusRequester(addFocus).padding(start = 8.dp))
+                FocusButton("Phone", onPhone, Modifier.padding(start = 8.dp))
                 FocusButton("Refresh", onRefresh, Modifier.padding(start = 8.dp))
                 FocusButton("Settings", onSettings, Modifier.padding(start = 8.dp))
             }
@@ -153,7 +155,7 @@ private fun EmptyState() {
         Text("Your command center is empty", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Press  + Add  to follow teams and players you have bets or fantasy stakes on.",
+            "Press  + Add  to follow teams and players, or  Phone  to type them in on your phone.",
             fontSize = 16.sp, color = Palette.Muted,
         )
     }

@@ -46,6 +46,9 @@ class TrackerEngine(private val store: WatchlistStore) {
     /** True while the activity is on screen; the service only draws overlays when it isn't. */
     val uiVisible = MutableStateFlow(false)
 
+    /** True while anyone holds the engine; phone sync runs on the same schedule. */
+    val active = MutableStateFlow(false)
+
     private val kick = Channel<Unit>(Channel.CONFLATED)
     private var holders = 0
     private var job: Job? = null
@@ -60,6 +63,7 @@ class TrackerEngine(private val store: WatchlistStore) {
     @Synchronized
     fun acquire() {
         holders++
+        active.value = true
         if (job?.isActive == true) return
         // After a long pause, diffing against stale data would replay an hour of plays as alerts.
         if (stoppedAt != 0L && SystemClock.elapsedRealtime() - stoppedAt > 5 * 60_000) tracker.resetBaseline()
@@ -74,6 +78,7 @@ class TrackerEngine(private val store: WatchlistStore) {
     fun release() {
         holders = (holders - 1).coerceAtLeast(0)
         if (holders == 0) {
+            active.value = false
             job?.cancel()
             stoppedAt = SystemClock.elapsedRealtime()
         }
@@ -88,9 +93,14 @@ class TrackerEngine(private val store: WatchlistStore) {
         // Delayed so there's time to press Home and see it land on top of another app.
         scope.launch {
             delay(TEST_ALERT_DELAY_MS)
-            _feed.value = (listOf(alert) + _feed.value).take(FEED_SIZE)
-            _popups.tryEmit(alert)
+            notify(alert)
         }
+    }
+
+    /** Adds an alert to the feed and pops it up right away. */
+    fun notify(alert: Alert) {
+        _feed.value = (listOf(alert) + _feed.value).take(FEED_SIZE)
+        _popups.tryEmit(alert)
     }
 
     private suspend fun loop() {

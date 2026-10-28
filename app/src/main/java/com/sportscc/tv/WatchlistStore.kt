@@ -50,6 +50,9 @@ class WatchlistStore(context: Context) {
         saveWatchlist(if (i >= 0) list.toMutableList().also { it[i] = item } else list + item)
     }
 
+    /** Replaces the whole list (phone sync), dropping duplicates by key. */
+    fun replaceAll(items: List<WatchItem>) = saveWatchlist(items.distinctBy { it.key })
+
     fun remove(key: String) = saveWatchlist(_watchlist.value.filterNot { it.key == key })
 
     fun moveToTop(key: String) {

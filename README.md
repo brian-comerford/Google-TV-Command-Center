@@ -56,14 +56,35 @@ should pop up over it about 6 seconds later.
 - **+ Add**: pick a league, then a team. Choose to follow the team, or pick a player from its roster.
   After you pick a player, you can add prop lines: choose the stat, set the line with the ± buttons,
   and choose Over or Under.
+- **Phone**: link your phone and edit the list there (see below).
 - **Select a card** to edit its props, move it to the top, or stop following it.
 - **Settings**: refresh rate during live games (10–60 s), every update or big plays only, and
   background alerts on or off.
 
+## Phone remote (edit your list on your phone)
+Typing is easier on a phone, so you can build your list on the website in `web/`, which is hosted on
+GitHub Pages: `https://brian-comerford.github.io/Google-TV-Command-Center/`.
+
+1. On the TV, press **Phone**. It shows this TV's code (like `K7QM-3XPA`) and a QR code.
+2. Scan the QR code with your phone's camera, or open the site and type the code. You only do this once.
+   If the TV already has a list, the site loads it.
+3. Add teams and players, type your prop lines, and tap **Send to TV**. The TV picks up the new list
+   within about 20 seconds (about 3 seconds while the Phone screen is open). It replaces the list on the TV.
+
+The phone and TV pass the list through [ntfy.sh](https://ntfy.sh), a free public message relay, on a
+channel named after the TV's code. There are no accounts. Anyone who knew your code could send your TV
+a list, so **New code** on the TV's Phone screen unlinks every phone. Messages are only kept on the
+relay for 12 hours, but both the TV and the phone keep their own copy of the list.
+
+**One-time setup:** in the repo on GitHub, go to **Settings → Pages** and set **Source** to
+**GitHub Actions**. After that, the *Phone website* workflow publishes `web/` on every push to the
+default branch. On a free plan, GitHub Pages only works if the repository is public.
+
 ## Project layout
 ```
 core/   Plain Kotlin (JVM). ESPN parsing, stat/prop/fantasy math, alert diffing, polling tracker. Has unit tests.
-app/    Android TV app. Compose for TV UI, background foreground service, overlay pop-ups.
+app/    Android TV app. Compose for TV UI, background foreground service, overlay pop-ups, phone sync.
+web/    Phone website (plain HTML/JS, no build step), deployed to GitHub Pages.
 ```
 To build locally you need the Android SDK (Android Studio is easiest): `./gradlew :app:assembleRelease`.
 Run the core tests with `./gradlew :core:test`.

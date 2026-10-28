@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -25,6 +26,7 @@ import com.sportscc.core.TeamWatch
 import com.sportscc.tv.ui.DashboardScreen
 import com.sportscc.tv.ui.LeaguePickerScreen
 import com.sportscc.tv.ui.ManageScreen
+import com.sportscc.tv.ui.PhoneScreen
 import com.sportscc.tv.ui.PlayerPickerScreen
 import com.sportscc.tv.ui.PropsScreen
 import com.sportscc.tv.ui.SccTheme
@@ -44,6 +46,7 @@ private sealed interface Screen {
     data class Props(val key: String) : Screen
     data class Manage(val key: String) : Screen
     data object Settings : Screen
+    data object Phone : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -130,6 +133,7 @@ class MainActivity : ComponentActivity() {
                 feed = feed,
                 banner = banner,
                 onAdd = { push(Screen.Leagues) },
+                onPhone = { push(Screen.Phone) },
                 onRefresh = { engine.refreshNow() },
                 onSettings = { push(Screen.Settings) },
                 onCardClick = { push(Screen.Manage(it.watch.key)) },
@@ -198,6 +202,17 @@ class MainActivity : ComponentActivity() {
                     onRemove = { store.remove(item.key); home() },
                     onBack = { pop() },
                 )
+            }
+
+            Screen.Phone -> {
+                val sync = scc.sync
+                val code by sync.code.collectAsStateWithLifecycle()
+                val status by sync.status.collectAsStateWithLifecycle()
+                DisposableEffect(Unit) {
+                    sync.fast.value = true
+                    onDispose { sync.fast.value = false }
+                }
+                PhoneScreen(BuildConfig.REMOTE_URL, code, status, onNewCode = { sync.newCode() }, onDone = { home() })
             }
 
             Screen.Settings -> SettingsScreen(

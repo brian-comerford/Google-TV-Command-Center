@@ -2,17 +2,25 @@ package com.sportscc.tv
 
 import android.app.Application
 import android.content.Context
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 
 class SccApp : Application() {
     lateinit var store: WatchlistStore
         private set
     lateinit var engine: TrackerEngine
         private set
+    lateinit var sync: PhoneSyncManager
+        private set
 
     override fun onCreate() {
         super.onCreate()
         store = WatchlistStore(this)
         engine = TrackerEngine(store)
+        sync = PhoneSyncManager(this, store) { engine.notify(it) }
+        MainScope().launch {
+            engine.active.collect { if (it) sync.start() else sync.stop() }
+        }
     }
 }
 
