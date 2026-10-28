@@ -36,6 +36,7 @@ import com.sportscc.tv.ui.SccTheme
 import com.sportscc.tv.ui.SettingsScreen
 import com.sportscc.tv.ui.TeamOptionsScreen
 import com.sportscc.tv.ui.TeamPickerScreen
+import com.sportscc.tv.ui.TrackModeScreen
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -47,6 +48,7 @@ private sealed interface Screen {
     data class TeamOptions(val league: League, val team: TeamInfo) : Screen
     data class Players(val league: League, val team: TeamInfo) : Screen
     data class Props(val key: String) : Screen
+    data class TrackMode(val key: String) : Screen
     data class Manage(val key: String) : Screen
     data object Settings : Screen
     data object Phone : Screen
@@ -207,10 +209,26 @@ class MainActivity : ComponentActivity() {
                     jersey = a.jersey,
                     headshot = a.headshot,
                     props = existing?.props ?: emptyList(),
+                    fantasy = existing?.fantasy ?: false,
                 )
                 store.upsert(watch)
                 home()
-                push(Screen.Props(watch.key))
+                push(Screen.TrackMode(watch.key))
+            }
+
+            is Screen.TrackMode -> {
+                val player = watchlist.firstOrNull { it.key == screen.key } as? PlayerWatch
+                if (player == null) LaunchedEffect(Unit) { home() } else TrackModeScreen(
+                    player,
+                    onFantasy = {
+                        store.updatePlayer(player.key) { it.copy(fantasy = true, props = emptyList()) }
+                        home()
+                    },
+                    onBets = {
+                        store.updatePlayer(player.key) { it.copy(fantasy = false) }
+                        stack[stack.lastIndex] = Screen.Props(player.key)
+                    },
+                )
             }
 
             is Screen.Props -> {
@@ -226,7 +244,16 @@ class MainActivity : ComponentActivity() {
                 val item = watchlist.firstOrNull { it.key == screen.key }
                 if (item == null) LaunchedEffect(Unit) { home() } else ManageScreen(
                     item,
-                    onEditProps = if (item is PlayerWatch) ({ stack[stack.lastIndex] = Screen.Props(item.key) }) else null,
+                    onEditProps = if (item is PlayerWatch && !item.fantasy) ({ stack[stack.lastIndex] = Screen.Props(item.key) }) else null,
+                    onToggleFantasy = if (item is PlayerWatch) ({
+                        if (item.fantasy) {
+                            store.updatePlayer(item.key) { it.copy(fantasy = false) }
+                            stack[stack.lastIndex] = Screen.Props(item.key)
+                        } else {
+                            store.updatePlayer(item.key) { it.copy(fantasy = true, props = emptyList()) }
+                            home()
+                        }
+                    }) else null,
                     onMove = {
                         movingKey = item.key
                         home()

@@ -101,6 +101,27 @@ class ParserTest {
     }
 }
 
+class FantasyTest {
+    @Test
+    fun fantasyPlayersShowScoreBeforeStatsAndGetPointsInAlerts() {
+        val w = PlayerWatch(League.NFL, "3918298", "Josh Allen", "2", "BUF", fantasy = true)
+        fun g(state: String) = EspnParser.parseScoreboard(Fixtures.scoreboard(Fixtures.event("401", state, "2", "BUF", 0, "15", "MIA", 0)), League.NFL)
+        fun box(yds: Int, td: Int) = EspnParser.parseSummary(Fixtures.summaryFootball("2",
+            passing = listOf(Fixtures.Ath("3918298", "Josh Allen", listOf("18/27", "$yds", "9.1", "$td", "0", "0-0", "70", "101.2")))), "401")
+
+        val pre = Snapshot(g("pre").associateBy { it.id }, emptyMap())
+        val card = Tracker.buildDashboard(listOf(w), pre, 0, emptyList()).cards.single() as PlayerCard
+        assertEquals("PPR" to 0.0, card.fantasy)
+
+        val a = Snapshot(g("in").associateBy { it.id }, mapOf("401" to box(200, 1)))
+        val b = Snapshot(g("in").associateBy { it.id }, mapOf("401" to box(225, 2)))
+        val alert = AlertEngine.diff(a, b, listOf(w), 1).single()
+        assertEquals("Josh Allen: +25 Pass YDS, +1 Pass TD (+5 PPR)", alert.title)
+        assertTrue(alert.detail!!, alert.detail!!.startsWith("17 PPR · "))
+        assertFalse(StatCatalog.propDefs(League.NFL).any { it.id.startsWith("fpts") })
+    }
+}
+
 class TrackerTest {
     private val bills = TeamWatch(League.NFL, "2", "BUF", "Buffalo Bills")
     private val allen = PlayerWatch(

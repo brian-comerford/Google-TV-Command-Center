@@ -45,7 +45,7 @@ import com.sportscc.tv.AppSettings
 @Composable
 fun PropsScreen(player: PlayerWatch, onChange: (List<Prop>) -> Unit, onDone: () -> Unit) = ScreenFrame {
     var editing by remember { mutableStateOf<StatDef?>(null) }
-    val defs = player.league.statDefs
+    val defs = StatCatalog.propDefs(player.league)
     Column {
         ScreenTitle(
             "Props & targets: ${player.name}",
@@ -132,10 +132,31 @@ private fun LineEditor(def: StatDef, onCancel: () -> Unit, onSave: (Double, Prop
     }
 }
 
+/** Asked right after picking a player: fantasy (no lines) or bets (go set lines). */
+@Composable
+fun TrackModeScreen(player: PlayerWatch, onFantasy: () -> Unit, onBets: () -> Unit) = ScreenFrame {
+    Column {
+        ScreenTitle("How are you following ${player.name}?", player.league.label)
+        val score = StatCatalog.fantasy(player.league)?.short
+        val first = rememberInitialFocus()
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            FocusButton(
+                if (score != null) "Fantasy: live stats and $score score" else "Fantasy: live stats",
+                onFantasy, Modifier.focusRequester(first), big = true,
+            )
+            FocusButton("Bets: add over/under lines", onBets, big = true)
+        }
+        Spacer(Modifier.height(14.dp))
+        Text("You can switch later: select the card, then Switch to bets / fantasy.", fontSize = 13.sp, color = Palette.Muted)
+    }
+}
+
 @Composable
 fun ManageScreen(
     item: WatchItem,
     onEditProps: (() -> Unit)?,
+    /** Players only: switch between fantasy (live score) and bets (lines). */
+    onToggleFantasy: (() -> Unit)?,
     onMove: () -> Unit,
     onMoveTop: () -> Unit,
     onRemove: () -> Unit,
@@ -152,6 +173,13 @@ fun ManageScreen(
                 FocusButton("Move (use the arrows)", onMove, Modifier.focusRequester(first), big = true)
             }
             FocusButton("Move to top", onMoveTop, big = true)
+            if (onToggleFantasy != null && item is PlayerWatch) {
+                FocusButton(
+                    if (item.fantasy) "Switch to bets (add over/under lines)"
+                    else "Switch to fantasy (live score, no lines" + (if (item.props.isNotEmpty()) ", removes your lines)" else ")"),
+                    onToggleFantasy, big = true,
+                )
+            }
             FocusButton("Stop following", onRemove, accent = Palette.Live, big = true)
             FocusButton("Back", onBack, big = true)
         }

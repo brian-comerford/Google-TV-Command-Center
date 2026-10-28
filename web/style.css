@@ -75,6 +75,9 @@ input.code { font-family: var(--mono); font-size: 20px; letter-spacing: .12em; t
 .prop { display: inline-flex; align-items: center; gap: 4px; background: var(--panel-hi); border-radius: 8px; padding: 4px 4px 4px 10px; font-size: 14px; }
 .prop b { color: var(--win); } .prop.under b { color: var(--warn); }
 .prop .x { font-size: 18px; padding: 2px 6px; }
+.prop.fantasy { padding: 5px 10px; color: var(--muted); }
+.prop.fantasy b { color: var(--accent); }
+.addprop.subtle { color: var(--muted); }
 .addprop { background: none; border: 1px dashed var(--line); color: var(--accent); border-radius: 8px; padding: 5px 10px; font: 600 14px var(--font); cursor: pointer; }
 .empty { background: var(--panel); border-radius: 14px; padding: 18px; }
 #list:not(:empty) + .empty { display: none; }

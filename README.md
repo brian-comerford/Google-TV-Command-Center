@@ -58,8 +58,10 @@ should pop up over it about 6 seconds later.
 
 ## Using it
 - **+ Add**: pick a league, then a team. Choose to follow the team, or pick a player from its roster.
-  After you pick a player, you can add prop lines: choose the stat, set the line with the ± buttons,
-  and choose Over or Under.
+  After you pick a player, choose how you're following them:
+  - **Fantasy**: the card leads with the live fantasy score (PPR for football, DraftKings for basketball)
+    next to the live stat line, with no lines to set. Alerts include the points change, e.g. "(+5.1 PPR)".
+  - **Bets**: add over/under lines: choose the stat, set the line with the ± buttons, and choose Over or Under.
 - **Phone**: link your phone and edit the list there (see below).
 - **Select a card** to edit its props, move it, move it to the top, or stop following it.
 - **Move a card**: select it, choose **Move**, then use the arrows to slide it around the grid. Press

@@ -118,6 +118,12 @@ object StatCatalog {
 
     fun find(league: League, id: String): StatDef? = league.statDefs.firstOrNull { it.id == id }
 
+    /** The sport's standard fantasy score (PPR for football, DraftKings for basketball), if it has one. */
+    fun fantasy(league: League): StatDef? = league.statDefs.firstOrNull { it.id.startsWith("fpts") }
+
+    /** Stats offered as over/under lines. Fantasy points aren't: fantasy players are tracked without lines. */
+    fun propDefs(league: League): List<StatDef> = league.statDefs.filterNot { it.id.startsWith("fpts") }
+
     fun groups(kind: SportKind): List<StatGroup> = when (kind) {
         SportKind.FOOTBALL -> listOf(
             StatGroup("passing", "Pass", listOf("C/ATT", "YDS", "TD", "INT")),

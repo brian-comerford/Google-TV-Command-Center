@@ -38,6 +38,8 @@ data class PlayerWatch(
     val jersey: String? = null,
     val headshot: String? = null,
     val props: List<Prop> = emptyList(),
+    /** Followed for fantasy: the card leads with the live fantasy score and there are no lines to set. */
+    val fantasy: Boolean = false,
 ) : WatchItem {
     override val key: String get() = "player:${league.name}:$athleteId"
     override val displayName: String get() = name

@@ -343,12 +343,27 @@ private fun PlayerCardView(card: PlayerCard, modifier: Modifier, moving: Boolean
             g?.let { StatusPill(it) }
         }
         Spacer(Modifier.height(8.dp))
-        when {
-            g == null -> Text("No game on today's slate", fontSize = 13.sp, color = Palette.Muted)
-            else -> Text(
-                if (g.state == GameState.PRE) "${g.away.abbreviation} @ ${g.home.abbreviation}" else g.scoreLine,
-                fontSize = 13.sp, color = Palette.Muted,
-            )
+        val fantasy = card.fantasy?.takeIf { w.fantasy }
+        Row(verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f)) {
+                if (w.fantasy) Pill("FANTASY", Palette.Accent, filled = false)
+                if (w.fantasy) Spacer(Modifier.height(4.dp))
+                Text(
+                    when {
+                        g == null -> "No game on today's slate"
+                        g.state == GameState.PRE -> "${g.away.abbreviation} @ ${g.home.abbreviation}"
+                        else -> g.scoreLine
+                    },
+                    fontSize = 13.sp, color = Palette.Muted,
+                )
+            }
+            // Fantasy players lead with the live score instead of over/under bars.
+            if (fantasy != null) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(String.format("%.1f", fantasy.second), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Palette.Accent)
+                    Text("${fantasy.first} PTS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Palette.Muted, letterSpacing = 1.sp)
+                }
+            }
         }
         if (g != null && g.state != GameState.PRE) {
             Spacer(Modifier.height(6.dp))
@@ -356,7 +371,7 @@ private fun PlayerCardView(card: PlayerCard, modifier: Modifier, moving: Boolean
                 Text(if (card.line?.didNotPlay == true) "Did not play" else "No stats yet", fontSize = 13.sp, color = Palette.Muted)
             } else {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    card.fantasy?.let { (label, pts) -> StatChipView(StatFormat.number(pts), label, Palette.Accent) }
+                    if (!w.fantasy) card.fantasy?.let { (label, pts) -> StatChipView(StatFormat.number(pts), label, Palette.Accent) }
                     card.chips.forEach { StatChipView(it.value, it.label) }
                 }
             }

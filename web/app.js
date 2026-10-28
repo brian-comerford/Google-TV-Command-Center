@@ -32,6 +32,8 @@
     ],
     soccer: [],
   };
+  // The live score a Fantasy card shows (matches StatCatalog.fantasy on the TV).
+  const fantasyLabel = leagueId => ({ football: 'PPR', basketball: 'DraftKings' })[leagueById(leagueId).kind] || '';
   const leagueById = id => LEAGUES.find(l => l.id === id);
   const statsFor = leagueId => STATS[leagueById(leagueId).kind];
   const statShort = (leagueId, statId) => (statsFor(leagueId).find(s => s[0] === statId) || [, , statId])[2];
@@ -117,7 +119,9 @@
       return `<div class="item"><div class="item-head">${pic(it.headshot)}
           <div class="who"><div class="name">${esc(it.name)}</div><div class="sub"><span class="league">${esc(league.label)}</span> ${esc([it.teamAbbreviation, it.position, it.jersey ? '#' + it.jersey : null].filter(Boolean).join(' · '))}</div></div>
           ${moveBtns(i)}<button class="x" data-remove="${i}" aria-label="Remove ${esc(it.name)}">×</button></div>
-        <div class="props">${props}<button class="addprop" data-addprop="${i}" type="button">+ Prop</button></div></div>`;
+        ${it.fantasy
+          ? `<div class="props"><span class="prop fantasy"><b>Fantasy</b> live stats${fantasyLabel(it.league) ? ' + ' + esc(fantasyLabel(it.league)) : ''}</span><button class="addprop" data-mode="${i}" type="button">Switch to bets</button></div></div>`
+          : `<div class="props">${props}<button class="addprop" data-addprop="${i}" type="button">+ Prop</button><button class="addprop subtle" data-mode="${i}" type="button">Fantasy instead</button></div></div>`}`;
     }).join('');
     renderStatus();
   }
@@ -143,6 +147,13 @@
     }
     else if (t.dataset.unprop) { const [i, j] = t.dataset.unprop.split(':').map(Number); items[i].props.splice(j, 1); changed(); }
     else if (t.dataset.addprop) openProp(+t.dataset.addprop);
+    else if (t.dataset.mode) {
+      const it = items[+t.dataset.mode];
+      it.fantasy = !it.fantasy;
+      if (it.fantasy) it.props = []; // fantasy players have no over/under lines
+      changed();
+      if (!it.fantasy) openProp(+t.dataset.mode);
+    }
   });
 
   // ---------- linking ----------
@@ -269,7 +280,7 @@
         return {
           text: a.name, done,
           html: `${pic(a.headshot)}<span>${esc(a.name)}<br><span class="sub">${esc([a.position, a.jersey ? '#' + a.jersey : null].filter(Boolean).join(' · '))}</span></span>${done ? '<span class="note">following</span>' : ''}`,
-          onClick: () => addPlayer(league, t, a),
+          onClick: () => push(modeStep(league, t, a)),
         };
       }),
     };
@@ -279,15 +290,25 @@
     if (!items.some(x => keyOf(x) === keyOf(it))) items.push(it);
     dlg.close(); changed();
   }
-  function addPlayer(league, t, a) {
+  function modeStep(league, t, a) {
+    const score = fantasyLabel(league.id);
+    return {
+      title: a.name, cls: 'choice',
+      load: () => [
+        { text: '', html: `Fantasy: live stats${score ? ' and ' + esc(score) + ' score' : ''}<br><span class="sub">No lines to set</span>`, onClick: () => addPlayer(league, t, a, true) },
+        { text: '', html: 'Bets: add over/under lines', onClick: () => addPlayer(league, t, a, false) },
+      ],
+    };
+  }
+  function addPlayer(league, t, a, fantasy) {
     const it = {
       type: 'player', league: league.id, athleteId: a.id, name: a.name, teamId: t.id, teamAbbreviation: t.abbreviation,
-      position: a.position, jersey: a.jersey, headshot: a.headshot, props: [],
+      position: a.position, jersey: a.jersey, headshot: a.headshot, props: [], fantasy,
     };
     let i = items.findIndex(x => keyOf(x) === keyOf(it));
-    if (i < 0) { items.push(it); i = items.length - 1; }
+    if (i < 0) { items.push(it); i = items.length - 1; } else { items[i].fantasy = fantasy; if (fantasy) items[i].props = []; }
     dlg.close(); changed();
-    openProp(i);
+    if (!fantasy) openProp(i);
   }
 
   // ---------- import from Player Prop Finder ----------
@@ -403,6 +424,7 @@
         items.push(it);
       }
       it.props = it.props || [];
+      it.fantasy = false; // a bet line makes this a bets card
       if (!it.props.some(p => p.statId === pk.statId && p.line === pk.line && p.side === pk.side)) {
         it.props.push({ statId: pk.statId, line: pk.line, side: pk.side });
       }
@@ -425,12 +447,12 @@
     propFor = i;
     const it = items[i];
     $('propTitle').textContent = 'Add a prop: ' + it.name;
-    $('propStat').innerHTML = statsFor(it.league).map(s => `<option value="${s[0]}">${esc(s[1])}</option>`).join('');
+    // Fantasy points aren't offered as a line: follow the player as Fantasy instead.
+    $('propStat').innerHTML = statsFor(it.league).filter(st => !st[0].startsWith('fpts')).map(s => `<option value="${s[0]}">${esc(s[1])}</option>`).join('');
     $('propLine').value = '0.5';
     $('sideOver').checked = true;
     pdlg.showModal();
   }
-  $('propStat').addEventListener('change', () => { if ($('propStat').value.startsWith('fpts') && $('propLine').value === '0.5') $('propLine').value = '15.5'; });
   $('propCancel').addEventListener('click', () => pdlg.close());
   $('propForm').addEventListener('submit', e => {
     e.preventDefault();

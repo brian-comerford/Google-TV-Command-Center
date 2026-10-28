@@ -167,8 +167,17 @@ object AlertEngine {
             }
         }
         if (parts.isEmpty()) return null
-        val detail = listOfNotNull(StatFormat.summary(kind, new).ifBlank { null }, g.lastPlay).joinToString("\n")
-        return Msg("${w.name}: ${parts.joinToString(", ")}", detail, big)
+        var line = StatFormat.summary(kind, new)
+        var title = "${w.name}: ${parts.joinToString(", ")}"
+        val fantasyDef = StatCatalog.fantasy(w.league)
+        if (w.fantasy && fantasyDef != null) {
+            val now = fantasyDef.evaluate(new) ?: 0.0
+            val delta = now - (fantasyDef.evaluate(old) ?: 0.0)
+            if (delta != 0.0) title += " (${if (delta > 0) "+" else "−"}${StatFormat.number(kotlin.math.abs(delta))} ${fantasyDef.short})"
+            line = "${StatFormat.number(now)} ${fantasyDef.short} · $line"
+        }
+        val detail = listOfNotNull(line.ifBlank { null }, g.lastPlay).joinToString("\n")
+        return Msg(title, detail, big)
     }
 
     private fun propAlerts(

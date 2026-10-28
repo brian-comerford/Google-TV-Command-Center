@@ -109,8 +109,10 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
                             val def = StatCatalog.find(w.league, p.statId) ?: return@mapNotNull null
                             PropProgress(p, def, def.evaluate(line) ?: 0.0)
                         }
-                        val fantasyDef = w.league.statDefs.firstOrNull { it.id.startsWith("fpts") }
-                        val fantasy = fantasyDef?.evaluate(line)?.let { fantasyDef.short to it }
+                        val fantasyDef = StatCatalog.fantasy(w.league)
+                        // Fantasy players show 0.0 before kickoff; for others the chip only appears with stats.
+                        val points = fantasyDef?.evaluate(line) ?: if (w.fantasy && fantasyDef != null) 0.0 else null
+                        val fantasy = points?.let { fantasyDef!!.short to it }
                         PlayerCard(w, g, line, StatFormat.chips(w.league.kind, line), props, fantasy)
                     }
                 }
