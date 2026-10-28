@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -54,7 +53,7 @@ class TrackerEngine(private val store: WatchlistStore) {
 
     init {
         scope.launch {
-            store.watchlist.distinctUntilChanged().collect { kick.trySend(Unit) }
+            store.watchlist.collect { kick.trySend(Unit) }
         }
     }
 
