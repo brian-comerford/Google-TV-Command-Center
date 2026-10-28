@@ -90,10 +90,46 @@ object AlertEngine {
                         propAlerts(w, oldGame, g, oldLine, newLine, prevHadBox).forEach { (t, d, big) -> add(w, t, d, big, w.headshot) }
                     }
                 }
+                is ParlayWatch -> parlayAlerts(w, prev, next).forEach { (t, d, big) -> add(w, t, d, big) }
             }
         }
         return alerts
     }
+
+    private fun parlayAlerts(w: ParlayWatch, prev: Snapshot, next: Snapshot): List<Msg> {
+        val before = ParlayEngine.evaluate(w, prev)
+        val after = ParlayEngine.evaluate(w, next)
+        val name = w.displayName
+        val win = w.toWin?.let { " · To win ${money(it)}" } ?: ""
+        if (before.status == ParlayStatus.LOST) return emptyList()
+        if (after.status == ParlayStatus.WON && before.status != ParlayStatus.WON) {
+            return listOf(Msg("PARLAY CASHED: $name", "${after.summary}${w.toWin?.let { " · Won ${money(it)}" } ?: ""}", true))
+        }
+        val out = mutableListOf<Msg>()
+        after.legs.forEachIndexed { i, a ->
+            val b = before.legs[i]
+            // A prop leg we had no box score for last poll may already be past its line: that's not news.
+            val g = a.game
+            val pg = g?.let { prev.games[it.id] }
+            if (a.leg is PropLeg && g != null && pg != null && pg.state != GameState.PRE && !prev.boxes.containsKey(g.id)) return@forEachIndexed
+            if (b.status.decided || !a.status.decided) return@forEachIndexed
+            when (a.status) {
+                LegStatus.WON -> {
+                    val left = after.legs.filter { !it.status.decided }
+                    val next1 = if (left.size == 1) " · One leg away: ${left.single().label}" else ""
+                    out += Msg("Parlay leg hit: ${a.label}", "$name · ${after.summary}$next1$win", true)
+                }
+                LegStatus.LOST -> if (out.none { it.title.startsWith("Parlay busted") }) {
+                    out += Msg("Parlay busted: ${a.label}", "$name · ${after.won} of ${after.legs.size} hit", true)
+                }
+                LegStatus.PUSH -> out += Msg("Parlay leg pushed: ${a.label}", "$name · ${after.summary}", false)
+                else -> Unit
+            }
+        }
+        return out
+    }
+
+    private fun money(d: Double): String = if (d == Math.floor(d)) "$" + d.toLong() else "$" + String.format("%.2f", d)
 
     private data class Msg(val title: String, val detail: String?, val big: Boolean)
 

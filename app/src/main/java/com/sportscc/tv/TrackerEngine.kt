@@ -113,6 +113,7 @@ class TrackerEngine(private val store: WatchlistStore) {
                 try {
                     val result = tracker.refresh(watchlist)
                     _dashboard.value = result.dashboard
+                    store.applySettlements(result.settlements)
                     live = result.dashboard.anyLive
                     if (result.alerts.isNotEmpty()) {
                         _feed.value = (result.alerts.reversed() + _feed.value).take(FEED_SIZE)

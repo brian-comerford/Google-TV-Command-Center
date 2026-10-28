@@ -81,9 +81,17 @@ GitHub Pages: `https://brian-comerford.github.io/Google-TV-Command-Center/`.
 3. Add teams and players, type your prop lines, and tap **Send to TV**. The TV picks up the new list
    within about 20 seconds (about 3 seconds while the Phone screen is open). It replaces the list on the TV.
 
+**+ Parlay** builds a parlay from any mix of legs: player props, moneylines, spreads and game totals,
+with optional odds and stake to show what it pays. On the TV, the parlay card lists every leg with ✓ hit,
+✗ lost, ● live (green winning / amber losing) or ○ not started, plus progress bars on prop and total legs,
+and a summary like "2 of 4 hit · 2 to go". Alerts fire when a leg hits (with "One leg away" when it's
+down to one), when the parlay busts, and when it cashes. Each leg is saved as settled the moment it's
+decided, so results don't reset when the scoreboard moves on to the next day or week.
+
 **Import picks** loads today's recommended bets from
 [Player Prop Finder](https://brian-comerford.github.io/Player-Prop-Finder/) (NFL), best edge first,
-filterable by confidence. Tick the ones you bet and they're added with their lines. That app uses
+filterable by confidence. Tick the ones you bet and they're added with their lines, or tap
+**Make a parlay** to turn them into one. That app uses
 nflverse player ids, so players are matched to ESPN rosters by name and team (checking every roster
 in case of a trade); anyone it can't match is listed so you can add them by hand.
 

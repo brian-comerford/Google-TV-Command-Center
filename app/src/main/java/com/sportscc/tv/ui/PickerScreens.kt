@@ -71,7 +71,7 @@ fun ScreenFrame(content: @Composable () -> Unit) {
 @Composable
 fun LeaguePickerScreen(onPick: (League) -> Unit) = ScreenFrame {
     Column {
-        ScreenTitle("Add to your command center", "Pick a league")
+        ScreenTitle("Add to your command center", "Pick a league. Parlays are easier to build on your phone: press Phone on the home screen.")
         val first = rememberInitialFocus()
         LazyVerticalGrid(
             columns = GridCells.Adaptive(220.dp),

@@ -257,3 +257,96 @@ class OrderTest {
         assertEquals(l, l.moved(0, -1))
     }
 }
+
+class ParlayTest {
+    private fun games(vararg e: String) = EspnParser.parseScoreboard(Fixtures.scoreboard(*e), League.NFL).associateBy { it.id }
+    private fun allenBox(yds: Int, int: Int) = EspnParser.parseSummary(Fixtures.summaryFootball("2",
+        passing = listOf(Fixtures.Ath("3918298", "Josh Allen", listOf("18/27", "$yds", "9.1", "2", "$int", "0-0", "70", "101.2")))), "401")
+
+    private val parlay = ParlayWatch(
+        id = "p1",
+        name = "Sunday 4-leg",
+        odds = 1050, stake = 10.0,
+        legs = listOf(
+            PropLeg(League.NFL, "3918298", "Josh Allen", "2", "BUF", Prop("pass_yds", 249.5)),
+            MoneylineLeg(League.NFL, "2", "BUF"),
+            SpreadLeg(League.NFL, "15", "MIA", 3.5),
+            TotalLeg(League.NFL, "2", "BUF", 47.5, Prop.Side.UNDER),
+        ),
+    )
+
+    @Test
+    fun evaluatesEveryLegTypeLiveAndFinal() {
+        val live = Snapshot(games(Fixtures.event("401", "in", "2", "BUF", 24, "15", "MIA", 17, period = 3)), mapOf("401" to allenBox(262, 0)))
+        val s = ParlayEngine.evaluate(parlay, live)
+        assertEquals(listOf(LegStatus.WON, LegStatus.LIVE_WINNING, LegStatus.LIVE_LOSING, LegStatus.LIVE_WINNING), s.legs.map { it.status })
+        assertEquals(ParlayStatus.LIVE, s.status)
+        assertEquals("1 of 4 hit · 3 to go", s.summary)
+        assertEquals("BUF @ MIA U 47.5", s.legs[3].label)
+        assertEquals("MIA +3.5", s.legs[2].label)
+        assertEquals(105.0, parlay.toWin!!, 1e-9) // +1050 on $10: $105 profit
+
+        val final = Snapshot(games(Fixtures.event("401", "post", "2", "BUF", 24, "15", "MIA", 21)), mapOf("401" to allenBox(262, 0)))
+        val f = ParlayEngine.evaluate(parlay, final)
+        // MIA +3.5 covers a 3-point loss; 45 total stays under 47.5.
+        assertEquals(listOf(LegStatus.WON, LegStatus.WON, LegStatus.WON, LegStatus.WON), f.legs.map { it.status })
+        assertEquals(ParlayStatus.WON, f.status)
+    }
+
+    @Test
+    fun settledLegsSurviveTheScoreboardMovingOn() {
+        val final = Snapshot(games(Fixtures.event("401", "post", "2", "BUF", 24, "15", "MIA", 30)), mapOf("401" to allenBox(262, 0)))
+        val st = ParlayEngine.evaluate(parlay, final)
+        assertEquals(ParlayStatus.LOST, st.status)
+        val saved = ParlayEngine.applySettlements(parlay, ParlayEngine.settlements(st))
+        // Next week: the same teams' next game hasn't started.
+        val nextWeek = Snapshot(games(Fixtures.event("402", "pre", "2", "BUF", 0, "15", "MIA", 0)), emptyMap())
+        val later = ParlayEngine.evaluate(saved, nextWeek)
+        assertEquals(st.legs.map { it.status }, later.legs.map { it.status })
+        assertEquals("Lost by 6", later.legs[1].now)
+    }
+
+    @Test
+    fun gamesFromBeforeTheParlayWasBuiltAreIgnored() {
+        val old = Snapshot(games(Fixtures.event("401", "post", "2", "BUF", 24, "15", "MIA", 30)), emptyMap())
+        val built = parlay.copy(createdAt = java.time.Instant.parse("2026-10-27T12:00:00Z").toEpochMilli())
+        assertTrue(ParlayEngine.evaluate(built, old).legs.all { it.status == LegStatus.PENDING })
+    }
+
+    @Test
+    fun alertsOnLegHitBustAndCash() {
+        val w = listOf<WatchItem>(parlay)
+        val a = Snapshot(games(Fixtures.event("401", "in", "2", "BUF", 14, "15", "MIA", 10)), mapOf("401" to allenBox(200, 0)))
+        val b = Snapshot(games(Fixtures.event("401", "in", "2", "BUF", 21, "15", "MIA", 10)), mapOf("401" to allenBox(262, 0)))
+        val hit = AlertEngine.diff(a, b, w, 1).single()
+        assertEquals("Parlay leg hit: Josh Allen O 249.5 Pass Yds", hit.title)
+        assertTrue(hit.detail!!, hit.detail!!.endsWith("To win $105"))
+
+        val c = Snapshot(games(Fixtures.event("401", "in", "2", "BUF", 31, "15", "MIA", 24)), mapOf("401" to allenBox(262, 0)))
+        assertEquals("Parlay busted: BUF @ MIA U 47.5", AlertEngine.diff(b, c, w, 2).single().title)
+        // Nothing more once it's busted.
+        val d = Snapshot(games(Fixtures.event("401", "post", "2", "BUF", 31, "15", "MIA", 24)), mapOf("401" to allenBox(262, 0)))
+        assertTrue(AlertEngine.diff(c, d, w, 3).isEmpty())
+
+        val cashP = listOf<WatchItem>(parlay.copy(legs = parlay.legs.take(2)))
+        val e = Snapshot(games(Fixtures.event("401", "post", "2", "BUF", 21, "15", "MIA", 10)), mapOf("401" to allenBox(262, 0)))
+        assertEquals("PARLAY CASHED: Sunday 4-leg", AlertEngine.diff(b, e, cashP, 4).single().title)
+    }
+
+    @Test
+    fun decodesParlaysBuiltOnTheWebsite() {
+        // Captured from web/app.js: a 4-leg parlay and a 2-leg one imported from Player Prop Finder.
+        val items = SyncCodec.decode(javaClass.getResource("/web-parlay-payload.txt")!!.readText()).items
+        val p = items.filterIsInstance<ParlayWatch>().first { it.name == "Sunday 4-leg" }
+        assertEquals(listOf("BUF to win", "MIA +3.5", "BUF game U 47.5", "Josh Allen O 249.5 Pass Yds"), p.legs.map { ParlayEngine.label(it) })
+        assertEquals(1050, p.odds)
+        assertEquals(105.0, p.toWin!!, 1e-9)
+        assertEquals(2, items.filterIsInstance<ParlayWatch>().size)
+    }
+
+    @Test
+    fun parlaysRoundTripThroughSync() {
+        val text = SyncCodec.encode(SyncPayload(items = listOf(parlay)))
+        assertEquals(listOf<WatchItem>(parlay), SyncCodec.decode(text).items)
+    }
+}

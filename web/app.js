@@ -37,7 +37,18 @@
   const leagueById = id => LEAGUES.find(l => l.id === id);
   const statsFor = leagueId => STATS[leagueById(leagueId).kind];
   const statShort = (leagueId, statId) => (statsFor(leagueId).find(s => s[0] === statId) || [, , statId])[2];
-  const keyOf = it => it.type === 'team' ? `team:${it.league}:${it.teamId}` : `player:${it.league}:${it.athleteId}`;
+  const keyOf = it => it.type === 'team' ? `team:${it.league}:${it.teamId}`
+    : it.type === 'parlay' ? `parlay:${it.id}` : `player:${it.league}:${it.athleteId}`;
+  // Same wording as ParlayEngine.label on the TV.
+  function legLabel(l) {
+    const side = s => (s === 'UNDER' ? 'U' : 'O');
+    if (l.type === 'prop') return `${l.name} ${side(l.prop.side)} ${num(l.prop.line)} ${statShort(l.league, l.prop.statId)}`;
+    if (l.type === 'moneyline') return `${l.teamAbbreviation} to win`;
+    if (l.type === 'spread') return `${l.teamAbbreviation} ${l.points > 0 ? '+' : ''}${num(l.points)}`;
+    return `${l.teamAbbreviation} game ${side(l.side)} ${num(l.line)}`;
+  }
+  const toWin = (odds, stake) => (odds && stake) ? stake * (odds > 0 ? odds / 100 : 100 / Math.abs(odds)) : null;
+  const money = n => '$' + (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
   const num = n => (Math.round(n * 10) / 10).toString();
   const $ = id => document.getElementById(id);
 
@@ -107,6 +118,16 @@
   }
   function render() {
     $('list').innerHTML = items.map((it, i) => {
+      if (it.type === 'parlay') {
+        const win = toWin(it.odds, it.stake);
+        const meta = [it.legs.length + ' legs', it.odds ? (it.odds > 0 ? '+' : '') + it.odds : null, it.stake ? money(it.stake) + (win ? ' to win ' + money(win) : '') : null].filter(Boolean).join(' · ');
+        const marks = { WON: '✓', LOST: '✗', PUSH: '–' };
+        return `<div class="item"><div class="item-head">
+          <div class="who"><div class="name">${esc(it.name || it.legs.length + '-leg parlay')}</div><div class="sub"><span class="badge">PARLAY</span> ${esc(meta)}</div></div>
+          ${moveBtns(i)}<button class="x" data-remove="${i}" aria-label="Remove parlay">×</button></div>
+          <div class="legs">${it.legs.map(l => `<div class="l"><span class="mark ${l.result || ''}">${marks[l.result] || '○'}</span><span>${esc(legLabel(l))}</span></div>`).join('')}</div>
+          <div class="props"><button class="addprop" data-editparlay="${i}" type="button">Edit parlay</button></div></div>`;
+      }
       const league = leagueById(it.league);
       if (it.type === 'team') {
         return `<div class="item"><div class="item-head">${pic(it.logo, true)}
@@ -147,6 +168,7 @@
     }
     else if (t.dataset.unprop) { const [i, j] = t.dataset.unprop.split(':').map(Number); items[i].props.splice(j, 1); changed(); }
     else if (t.dataset.addprop) openProp(+t.dataset.addprop);
+    else if (t.dataset.editparlay) openParlay(+t.dataset.editparlay);
     else if (t.dataset.mode) {
       const it = items[+t.dataset.mode];
       it.fantasy = !it.fantasy;
@@ -242,7 +264,7 @@
   function push(step) { addStack.push(step); showStep(step); }
   $('addBack').addEventListener('click', () => { if (addStack.length > 1) { addStack.pop(); showStep(addStack[addStack.length - 1]); } });
   $('addClose').addEventListener('click', () => dlg.close());
-  $('addBtn').addEventListener('click', () => { addStack = []; push(leagueStep()); dlg.showModal(); });
+  $('addBtn').addEventListener('click', () => { legMode = false; addStack = []; push(leagueStep()); dlg.showModal(); });
 
   function leagueStep() {
     return {
@@ -258,12 +280,24 @@
         return {
           text: t.name + ' ' + t.abbreviation, done,
           html: `${pic(t.logo, true)}<span>${esc(t.name)}</span>${done ? '<span class="note">following</span>' : ''}`,
-          onClick: () => league.kind === 'soccer' ? addTeam(league, t) : push(teamChoiceStep(league, t)),
+          onClick: () => league.kind === 'soccer' && !legMode ? addTeam(league, t) : push(teamChoiceStep(league, t)),
         };
       }),
     };
   }
   function teamChoiceStep(league, t) {
+    if (legMode) {
+      const base = { league: league.id, teamId: t.id, teamAbbreviation: t.abbreviation };
+      return {
+        title: t.name, cls: 'choice',
+        load: () => [
+          { text: '', html: `Moneyline: ${esc(t.short)} to win`, onClick: () => { addLeg(Object.assign({ type: 'moneyline' }, base)); dlg.close(); } },
+          { text: '', html: `Spread: ${esc(t.short)} ±points`, onClick: () => { dlg.close(); openLegForm('spread', base, t); } },
+          { text: '', html: `Game total: ${esc(t.short)} game over/under`, onClick: () => { dlg.close(); openLegForm('total', base, t); } },
+          ...(league.kind === 'soccer' ? [] : [{ text: '', html: `Player prop: a ${esc(t.short)} player`, onClick: () => push(playerStep(league, t)) }]),
+        ],
+      };
+    }
     return {
       title: t.name, cls: 'choice',
       load: () => [
@@ -280,7 +314,7 @@
         return {
           text: a.name, done,
           html: `${pic(a.headshot)}<span>${esc(a.name)}<br><span class="sub">${esc([a.position, a.jersey ? '#' + a.jersey : null].filter(Boolean).join(' · '))}</span></span>${done ? '<span class="note">following</span>' : ''}`,
-          onClick: () => push(modeStep(league, t, a)),
+          onClick: () => legMode ? (dlg.close(), openPropLeg(league, t, a)) : push(modeStep(league, t, a)),
         };
       }),
     };
@@ -363,12 +397,14 @@
     }).join('') : '<p class="muted">No picks match this filter.</p>';
     $('importCount').textContent = `${selected.size} selected`;
     $('importGo').disabled = !selected.size;
+    $('importParlay').disabled = selected.size < 2;
   }
   $('importList').addEventListener('change', e => {
     const id = Number(e.target.dataset.pick);
     if (e.target.checked) selected.add(id); else selected.delete(id);
     $('importCount').textContent = `${selected.size} selected`;
     $('importGo').disabled = !selected.size;
+    $('importParlay').disabled = selected.size < 2;
   });
   $('importFilters').addEventListener('click', e => {
     const b = e.target.closest('[data-conf]'); if (!b) return;
@@ -407,6 +443,21 @@
     }
     return null;
   }
+  $('importParlay').addEventListener('click', async () => {
+    const chosen = picks.filter(p => selected.has(p.id));
+    $('importParlay').disabled = true;
+    $('importCount').textContent = 'Building…';
+    const legs = [], missed = [];
+    for (const pk of chosen) {
+      const found = await findNflPlayer(pk.raw.player_name, pk.raw.team).catch(() => null);
+      if (!found) { missed.push(pk.raw.player_name); continue; }
+      legs.push({ type: 'prop', league: 'NFL', athleteId: found.athlete.id, name: found.athlete.name, teamId: found.team.id,
+        teamAbbreviation: found.team.abbreviation, headshot: found.athlete.headshot, prop: { statId: pk.statId, line: pk.line, side: pk.side } });
+    }
+    selected.clear(); idlg.close();
+    openParlay(null, legs);
+    if (missed.length) { $('parlayError').textContent = `Couldn't find ${missed.join(', ')} on an ESPN roster. Add them with + Add leg.`; $('parlayError').hidden = false; }
+  });
   $('importGo').addEventListener('click', async () => {
     const chosen = picks.filter(p => selected.has(p.id));
     $('importGo').disabled = true;
@@ -443,8 +494,21 @@
   // ---------- prop form ----------
   const pdlg = $('propDialog');
   let propFor = -1;
+  let propLeg = null; // set when the prop form is adding a parlay leg instead of a player's prop
+  function openPropLeg(league, t, a) {
+    propLeg = { type: 'prop', league: league.id, athleteId: a.id, name: a.name, teamId: t.id, teamAbbreviation: t.abbreviation, headshot: a.headshot };
+    fillPropForm('Parlay leg: ' + a.name, league.id);
+    pdlg.showModal();
+  }
+  function fillPropForm(title, leagueId) {
+    $('propTitle').textContent = title;
+    $('propStat').innerHTML = statsFor(leagueId).filter(st => !st[0].startsWith('fpts')).map(s => `<option value="${s[0]}">${esc(s[1])}</option>`).join('');
+    $('propLine').value = '0.5';
+    $('sideOver').checked = true;
+  }
   function openProp(i) {
     propFor = i;
+    propLeg = null;
     const it = items[i];
     $('propTitle').textContent = 'Add a prop: ' + it.name;
     // Fantasy points aren't offered as a line: follow the player as Fantasy instead.
@@ -453,14 +517,90 @@
     $('sideOver').checked = true;
     pdlg.showModal();
   }
-  $('propCancel').addEventListener('click', () => pdlg.close());
+  $('propCancel').addEventListener('click', () => { propLeg = null; pdlg.close(); });
   $('propForm').addEventListener('submit', e => {
     e.preventDefault();
     const line = parseFloat($('propLine').value);
     if (!(line >= 0)) return;
     const side = $('sideUnder').checked ? 'UNDER' : 'OVER';
+    if (propLeg) {
+      addLeg(Object.assign({}, propLeg, { prop: { statId: $('propStat').value, line, side } }));
+      propLeg = null; pdlg.close(); return;
+    }
     items[propFor].props = (items[propFor].props || []).concat({ statId: $('propStat').value, line, side });
     pdlg.close(); changed();
+  });
+
+  // ---------- parlays ----------
+  const pldlg = $('parlayDialog');
+  let draft = null, draftIndex = -1, legMode = false;
+  function openParlay(i, legs) {
+    draftIndex = i == null ? -1 : i;
+    const src = draftIndex >= 0 ? items[draftIndex] : null;
+    draft = src ? JSON.parse(JSON.stringify(src))
+      : { type: 'parlay', id: Math.random().toString(36).slice(2, 10), name: '', legs: legs || [], createdAt: Date.now() };
+    $('parlayTitle').textContent = src ? 'Edit parlay' : 'Build a parlay';
+    $('parlayName').value = draft.name || '';
+    $('parlayOdds').value = draft.odds ? (draft.odds > 0 ? '+' : '') + draft.odds : '';
+    $('parlayStake').value = draft.stake || '';
+    $('parlayError').hidden = true;
+    renderDraft();
+    pldlg.showModal();
+  }
+  function parseOdds() {
+    const v = parseInt(String($('parlayOdds').value).replace(/[^0-9-]/g, ''), 10);
+    return Number.isFinite(v) && Math.abs(v) >= 100 ? v : null;
+  }
+  function renderDraft() {
+    $('legList').innerHTML = draft.legs.length ? draft.legs.map((l, i) =>
+      `<div class="leg"><span class="what">${esc(legLabel(l))}<span class="sub">${esc(leagueById(l.league).label)}${l.result ? ' · ' + l.result.toLowerCase() : ''}</span></span>
+        <button class="x" data-unleg="${i}" aria-label="Remove leg">×</button></div>`).join('')
+      : '<p class="muted">No legs yet. Tap + Add leg for a player prop, moneyline, spread or game total.</p>';
+    const stake = parseFloat($('parlayStake').value);
+    const win = toWin(parseOdds(), stake > 0 ? stake : null);
+    $('parlayWin').textContent = win ? 'To win ' + money(win) : '';
+  }
+  function addLeg(l) { draft.legs.push(l); renderDraft(); }
+  $('legList').addEventListener('click', e => {
+    const b = e.target.closest('[data-unleg]'); if (!b) return;
+    draft.legs.splice(+b.dataset.unleg, 1); renderDraft();
+  });
+  ['parlayOdds', 'parlayStake'].forEach(id => $(id).addEventListener('input', renderDraft));
+  $('parlayBtn').addEventListener('click', () => openParlay(null));
+  $('parlayClose').addEventListener('click', () => pldlg.close());
+  $('addLegBtn').addEventListener('click', () => { legMode = true; addStack = []; push(leagueStep()); dlg.showModal(); });
+  dlg.addEventListener('close', () => { if (!pldlg.open) legMode = false; });
+  $('parlaySave').addEventListener('click', () => {
+    if (draft.legs.length < 2) { $('parlayError').textContent = 'A parlay needs at least 2 legs.'; $('parlayError').hidden = false; return; }
+    draft.name = $('parlayName').value.trim();
+    const odds = parseOdds(), stake = parseFloat($('parlayStake').value);
+    if (odds) draft.odds = odds; else delete draft.odds;
+    if (stake > 0) draft.stake = stake; else delete draft.stake;
+    if (draftIndex >= 0) items[draftIndex] = draft; else items.push(draft);
+    legMode = false; pldlg.close(); changed();
+  });
+
+  const ldlg = $('legDialog');
+  let legBase = null, legKind = '';
+  function openLegForm(kind, base, t) {
+    legBase = base; legKind = kind;
+    $('legTitle').textContent = kind === 'spread' ? `Spread: ${t.short}` : `Game total: ${t.short} game`;
+    $('legNumLabel').textContent = kind === 'spread' ? `Points for the ${t.short} (e.g. -3.5 favored, +3.5 underdog)` : 'Total points line';
+    $('legNum').value = kind === 'spread' ? '-3.5' : '45.5';
+    $('legNum').min = kind === 'spread' ? '' : '0';
+    $('legSide').hidden = kind !== 'total';
+    $('legOver').checked = true;
+    ldlg.showModal();
+  }
+  $('legCancel').addEventListener('click', () => ldlg.close());
+  $('legForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const n = parseFloat($('legNum').value);
+    if (!Number.isFinite(n)) return;
+    addLeg(legKind === 'spread'
+      ? Object.assign({ type: 'spread', points: n }, legBase)
+      : Object.assign({ type: 'total', line: n, side: $('legUnder').checked ? 'UNDER' : 'OVER' }, legBase));
+    ldlg.close();
   });
 
   // ---------- install / update card ----------

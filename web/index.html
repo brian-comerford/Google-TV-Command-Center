@@ -66,6 +66,7 @@
         <h2>Your list</h2>
         <div class="row">
           <button class="btn" id="importBtn" type="button">Import picks</button>
+          <button class="btn" id="parlayBtn" type="button">+ Parlay</button>
           <button class="btn primary" id="addBtn" type="button">+ Add</button>
         </div>
       </div>
@@ -115,9 +116,52 @@
       <div id="importList" class="picker"></div>
       <div class="row between">
         <span class="muted small" id="importCount">0 selected</span>
-        <button class="btn primary" id="importGo" type="button" disabled>Add to my list</button>
+        <div class="row">
+          <button class="btn" id="importParlay" type="button" disabled>Make a parlay</button>
+          <button class="btn primary" id="importGo" type="button" disabled>Add to my list</button>
+        </div>
       </div>
     </div>
+  </dialog>
+
+  <!-- Parlay builder -->
+  <dialog id="parlayDialog">
+    <div class="sheet parlay-sheet">
+      <div class="row between">
+        <h3 id="parlayTitle">Build a parlay</h3>
+        <button class="btn ghost" id="parlayClose" type="button">Close</button>
+      </div>
+      <label for="parlayName" class="sr">Name</label>
+      <input id="parlayName" placeholder="Name (optional), e.g. Sunday 4-leg" autocomplete="off">
+      <div class="row">
+        <div class="grow"><label for="parlayOdds" class="small muted">Parlay odds</label><input id="parlayOdds" inputmode="text" placeholder="+1050" autocomplete="off"></div>
+        <div class="grow"><label for="parlayStake" class="small muted">Stake ($)</label><input id="parlayStake" type="number" inputmode="decimal" min="0" step="1" placeholder="10" autocomplete="off"></div>
+      </div>
+      <div id="legList" class="picker"></div>
+      <div class="row between">
+        <button class="btn" id="addLegBtn" type="button">+ Add leg</button>
+        <span class="muted small" id="parlayWin"></span>
+        <button class="btn primary" id="parlaySave" type="button">Save parlay</button>
+      </div>
+      <p class="error" id="parlayError" hidden></p>
+    </div>
+  </dialog>
+
+  <!-- Spread / total leg -->
+  <dialog id="legDialog">
+    <form class="sheet" id="legForm">
+      <h3 id="legTitle">Spread</h3>
+      <label for="legNum" id="legNumLabel">Points</label>
+      <input id="legNum" type="number" inputmode="decimal" step="0.5" required>
+      <div class="seg" role="radiogroup" aria-label="Over or under" id="legSide">
+        <input type="radio" name="legside" id="legOver" value="OVER" checked><label for="legOver">Over</label>
+        <input type="radio" name="legside" id="legUnder" value="UNDER"><label for="legUnder">Under</label>
+      </div>
+      <div class="row end">
+        <button class="btn ghost" type="button" id="legCancel">Cancel</button>
+        <button class="btn primary" type="submit">Add leg</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Prop form -->

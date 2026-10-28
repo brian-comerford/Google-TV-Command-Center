@@ -69,7 +69,12 @@ import com.sportscc.core.Competitor
 import com.sportscc.core.Dashboard
 import com.sportscc.core.Game
 import com.sportscc.core.GameState
+import com.sportscc.core.LegState
+import com.sportscc.core.LegStatus
+import com.sportscc.core.ParlayCard
+import com.sportscc.core.ParlayStatus
 import com.sportscc.core.PlayerCard
+import com.sportscc.core.decided
 import com.sportscc.core.Prop
 import com.sportscc.core.PropProgress
 import com.sportscc.core.SportKind
@@ -179,6 +184,7 @@ fun DashboardScreen(
                                 when (card) {
                                     is TeamCard -> TeamCardView(card, mod, moving) { onCardClick(card) }
                                     is PlayerCard -> PlayerCardView(card, mod, moving) { onCardClick(card) }
+                                    is ParlayCard -> ParlayCardView(card, mod, moving) { onCardClick(card) }
                                 }
                             }
                         }
@@ -381,6 +387,69 @@ private fun PlayerCardView(card: PlayerCard, modifier: Modifier, moving: Boolean
         if (card.props.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
             card.props.forEach { PropRow(it, g?.state) }
+        }
+    }
+}
+
+@Composable
+private fun ParlayCardView(card: ParlayCard, modifier: Modifier, moving: Boolean, onClick: () -> Unit) {
+    val w = card.watch
+    val st = card.state
+    TileCard(onClick, modifier.fillMaxWidth(), highlight = cardHighlight(card.game, moving)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Pill("${w.legs.size}-LEG PARLAY", Palette.Accent, filled = false)
+            Spacer(Modifier.weight(1f))
+            when (st.status) {
+                ParlayStatus.WON -> Pill("CASHED", Palette.Win)
+                ParlayStatus.LOST -> Pill("BUSTED", Palette.Live)
+                ParlayStatus.PUSH -> Pill("PUSH", Palette.Muted, filled = false)
+                ParlayStatus.LIVE -> Pill("LIVE", Palette.Live)
+                ParlayStatus.PENDING -> card.game?.let { Pill(formatStart(it), Palette.Accent, filled = false) }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(w.displayName, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        val money = listOfNotNull(
+            w.odds?.let { if (it > 0) "+$it" else "$it" },
+            w.stake?.let { s -> "$" + StatFormat.number(s) + (w.toWin?.let { " to win $" + String.format("%.2f", it).removeSuffix(".00") } ?: "") },
+        ).joinToString(" · ")
+        if (money.isNotEmpty()) Text(money, fontSize = 12.sp, color = Palette.Muted)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            st.summary, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+            color = when (st.status) {
+                ParlayStatus.WON -> Palette.Win
+                ParlayStatus.LOST -> Palette.Live
+                else -> Palette.Text
+            },
+        )
+        Spacer(Modifier.height(6.dp))
+        st.legs.forEach { LegRow(it) }
+    }
+}
+
+@Composable
+private fun LegRow(l: LegState) {
+    val (mark, color) = when (l.status) {
+        LegStatus.WON -> "✓" to Palette.Win
+        LegStatus.LOST -> "✗" to Palette.Live
+        LegStatus.LIVE_WINNING -> "●" to Palette.Win
+        LegStatus.LIVE_LOSING -> "●" to Palette.Warn
+        LegStatus.PUSH -> "–" to Palette.Muted
+        LegStatus.PENDING -> "○" to Palette.Muted
+    }
+    Column(Modifier.padding(bottom = 5.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(mark, fontSize = 14.sp, fontWeight = FontWeight.Black, color = color, modifier = Modifier.width(18.dp))
+            Text(
+                l.label, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                color = if (l.status == LegStatus.LOST) Palette.Muted else Palette.Text,
+            )
+            l.now?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color, modifier = Modifier.padding(start = 6.dp)) }
+        }
+        val f = l.fraction
+        if (f != null && !l.status.decided && l.status != LegStatus.PENDING) {
+            ProgressBar(f.toFloat(), color, Modifier.padding(start = 18.dp, top = 2.dp))
         }
     }
 }

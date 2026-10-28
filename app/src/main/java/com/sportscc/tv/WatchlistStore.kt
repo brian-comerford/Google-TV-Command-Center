@@ -1,7 +1,10 @@
 package com.sportscc.tv
 
 import android.content.Context
+import com.sportscc.core.ParlayEngine
+import com.sportscc.core.ParlayWatch
 import com.sportscc.core.PlayerWatch
+import com.sportscc.core.Settlement
 import com.sportscc.core.WatchItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,6 +70,12 @@ class WatchlistStore(context: Context) {
     fun reorder(keys: List<String>) {
         val rank = keys.withIndex().associate { (i, k) -> k to i }
         saveWatchlist(_watchlist.value.sortedBy { rank[it.key] ?: Int.MAX_VALUE })
+    }
+
+    /** Saves parlay legs the tracker just decided, so they stay decided after the scoreboard moves on. */
+    fun applySettlements(settlements: List<Settlement>) {
+        if (settlements.isEmpty()) return
+        saveWatchlist(_watchlist.value.map { if (it is ParlayWatch) ParlayEngine.applySettlements(it, settlements) else it })
     }
 
     fun moveToTop(key: String) {

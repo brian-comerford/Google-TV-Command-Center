@@ -35,7 +35,10 @@ data class Dashboard(
     val errors: List<String>,
 )
 
-data class RefreshResult(val dashboard: Dashboard, val alerts: List<Alert>)
+data class ParlayCard(override val watch: ParlayWatch, override val game: Game?, val state: ParlayState) : Card
+
+/** [settlements]: parlay legs decided this poll, for the app to save onto the stored parlay. */
+data class RefreshResult(val dashboard: Dashboard, val alerts: List<Alert>, val settlements: List<Settlement> = emptyList())
 
 /**
  * Polls ESPN for every league in the watchlist, fetches box scores only for games that matter,
@@ -54,7 +57,7 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
         val errors = mutableListOf<String>()
         val prev = previous
 
-        val leagues = watchlist.map { it.league }.distinct()
+        val leagues = watchlist.flatMap { w -> if (w is ParlayWatch) w.legs.map { it.league } else listOf(w.league) }.distinct()
         val scoreboards = leagues.map { league ->
             async {
                 league to runCatching { client.scoreboard(league) }
@@ -71,8 +74,16 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
                 }
         }
 
-        val boxGames = watchlist.filterIsInstance<PlayerWatch>()
-            .mapNotNull { gameForTeam(games.values, it.league, it.teamId) }
+        // Box scores are only needed for games with a followed player or a player-prop parlay leg.
+        val playerTeams = watchlist.flatMap { w ->
+            when (w) {
+                is PlayerWatch -> listOf(w.league to w.teamId)
+                is ParlayWatch -> w.legs.filter { it is PropLeg && it.result == null }.map { it.league to it.teamId }
+                else -> emptyList()
+            }
+        }
+        val boxGames = playerTeams
+            .mapNotNull { (league, teamId) -> gameForTeam(games.values, league, teamId) }
             .filter { it.state != GameState.PRE }
             .distinctBy { it.id }
 
@@ -94,7 +105,9 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
         val alerts = if (prev == null) emptyList() else AlertEngine.diff(prev, snapshot, watchlist, now)
         previous = snapshot
 
-        RefreshResult(buildDashboard(watchlist, snapshot, now, errors), alerts)
+        val settlements = watchlist.filterIsInstance<ParlayWatch>()
+            .flatMap { ParlayEngine.settlements(ParlayEngine.evaluate(it, snapshot)) }
+        RefreshResult(buildDashboard(watchlist, snapshot, now, errors), alerts, settlements)
     }
 
     companion object {
@@ -102,6 +115,14 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
             val cards = watchlist.map { w ->
                 when (w) {
                     is TeamWatch -> TeamCard(w, gameForTeam(snap.games.values, w.league, w.teamId))
+                    is ParlayWatch -> {
+                        val state = ParlayEngine.evaluate(w, snap)
+                        // The card's "game" decides live highlighting and live-first sorting.
+                        val g = state.legs.mapNotNull { it.game }.let { gs ->
+                            gs.firstOrNull { it.state == GameState.IN } ?: gs.firstOrNull { it.state == GameState.PRE } ?: gs.firstOrNull()
+                        }
+                        ParlayCard(w, g, state)
+                    }
                     is PlayerWatch -> {
                         val g = gameForTeam(snap.games.values, w.league, w.teamId)
                         val line = g?.let { snap.boxes[it.id]?.players?.get(w.athleteId) }

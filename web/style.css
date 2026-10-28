@@ -117,7 +117,8 @@ dialog::backdrop { background: rgba(0, 0, 0, .6); }
 .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border-radius: 10px; padding: 4px; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg label { text-align: center; padding: 10px; border-radius: 8px; font-weight: 700; color: var(--muted); cursor: pointer; margin: 0 !important; font-size: 15px !important; }
-#sideOver:checked + label { background: var(--win); color: #06210f; }
+#sideOver:checked + label, #legOver:checked + label { background: var(--win); color: #06210f; }
+#legUnder:checked + label { background: var(--warn); color: #2a1a00; }
 #sideUnder:checked + label { background: var(--warn); color: #2a1a00; }
 .seg input:focus-visible + label { outline: 2px solid var(--accent); }
 @media (prefers-reduced-motion: no-preference) { .item { animation: in .2s ease-out; } }
@@ -149,3 +150,20 @@ dialog::backdrop { background: rgba(0, 0, 0, .6); }
 .steps { margin: 12px 0 8px; padding-left: 20px; display: grid; gap: 10px; }
 .copyrow { display: flex; gap: 8px; margin-top: 6px; }
 .copyrow input { font-family: var(--mono); font-size: 13px; }
+
+/* parlays */
+.parlay-sheet { grid-template-rows: auto auto auto 1fr auto auto; }
+.parlay-sheet .grow { display: grid; gap: 4px; }
+.leg { display: flex; align-items: center; gap: 8px; background: var(--panel-hi); border-radius: 10px; padding: 9px 6px 9px 12px; font-size: 15px; }
+.leg .what { flex: 1; min-width: 0; }
+.leg .sub { display: block; }
+.legs { display: grid; gap: 4px; font-size: 14px; }
+.legs .l { display: flex; gap: 8px; align-items: baseline; }
+.legs .mark { width: 14px; font-weight: 900; color: var(--muted); }
+.legs .WON { color: var(--win); } .legs .LOST { color: var(--live); } .legs .PUSH { color: var(--muted); }
+.badge { font-size: 11px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); padding: 2px 7px; border-radius: 6px; }
+.section-head { flex-wrap: wrap; row-gap: 10px; }
+@media (max-width: 480px) {
+  .section-head > .row { width: 100%; }
+  .section-head > .row .btn { flex: 1; padding-inline: 8px; }
+}
