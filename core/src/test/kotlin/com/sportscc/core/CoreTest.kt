@@ -176,6 +176,11 @@ class TrackerTest {
         assertTrue(titles.toString(), "Josh Allen: +250 Pass YDS, +1 Pass TD" in titles)
         assertTrue(titles.toString(), "PROP HIT: Josh Allen over 249.5 Pass Yds" in titles)
         assertTrue(r2.alerts.first { it.title == "BUF TOUCHDOWN" }.big)
+        // The stat update carries every prop's progress for the pop-up's bars.
+        val statPop = r2.alerts.first { it.title.startsWith("Josh Allen:") }
+        assertEquals(listOf("pass_yds" to 260.0, "pass_int" to 0.0), statPop.props.map { it.def.id to it.current })
+        assertTrue(statPop.props.all { it.winning })
+        assertTrue(r2.alerts.first { it.title == "BUF TOUCHDOWN" }.props.isEmpty())
 
         val card = r2.dashboard.cards.first { it is PlayerCard } as PlayerCard
         val yds = card.props.first { it.def.id == "pass_yds" }

@@ -105,10 +105,7 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
                     is PlayerWatch -> {
                         val g = gameForTeam(snap.games.values, w.league, w.teamId)
                         val line = g?.let { snap.boxes[it.id]?.players?.get(w.athleteId) }
-                        val props = w.props.mapNotNull { p ->
-                            val def = StatCatalog.find(w.league, p.statId) ?: return@mapNotNull null
-                            PropProgress(p, def, def.evaluate(line) ?: 0.0)
-                        }
+                        val props = AlertEngine.propProgress(w, line)
                         val fantasyDef = StatCatalog.fantasy(w.league)
                         // Fantasy players show 0.0 before kickoff; for others the chip only appears with stats.
                         val points = fantasyDef?.evaluate(line) ?: if (w.fantasy && fantasyDef != null) 0.0 else null

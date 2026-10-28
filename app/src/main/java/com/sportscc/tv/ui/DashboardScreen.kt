@@ -511,7 +511,11 @@ fun AlertBanner(alert: Alert?, modifier: Modifier = Modifier) {
                     fontSize = 12.sp, fontWeight = FontWeight.Black, color = accent, letterSpacing = 1.sp,
                 )
                 Text(a.title, fontSize = if (a.big) 22.sp else 19.sp, fontWeight = FontWeight.Bold, color = Palette.Text, maxLines = 2)
-                a.detail?.let { Text(it, fontSize = 14.sp, color = Palette.Muted, maxLines = 3) }
+                a.detail?.let { Text(it, fontSize = 14.sp, color = Palette.Muted, maxLines = if (a.props.isEmpty()) 3 else 2) }
+                if (a.props.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    a.props.forEach { PropRow(it, null) }
+                }
             }
         }
     }

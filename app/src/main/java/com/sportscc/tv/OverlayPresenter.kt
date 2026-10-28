@@ -13,6 +13,9 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.sportscc.core.Alert
+import com.sportscc.core.Prop
+import com.sportscc.core.PropProgress
+import com.sportscc.core.StatFormat
 
 /** Draws a small alert card in the top-right corner over whatever app is on screen. */
 class OverlayPresenter(private val context: Context) {
@@ -78,10 +81,60 @@ class OverlayPresenter(private val context: Context) {
                     setTextColor(Color.parseColor("#B8C1D1"))
                     textSize = 15f
                     maxWidth = dp(460)
-                    maxLines = 3
+                    maxLines = if (alert.props.isEmpty()) 3 else 2
                     ellipsize = TextUtils.TruncateAt.END
                 })
             }
+            alert.props.forEach { addView(propRow(it)) }
+        }
+    }
+
+    /** Same colors as the card's bars: green winning, amber still short, red for a busted under. */
+    private fun propRow(p: PropProgress): View {
+        val over = p.prop.side == Prop.Side.OVER
+        val color = Color.parseColor(
+            when {
+                p.winning -> "#34C759"
+                over -> "#FFB020"
+                else -> "#FF3B30"
+            },
+        )
+        val status = when {
+            over && p.winning -> "  HIT"
+            !over && !p.winning -> "  BUSTED"
+            else -> ""
+        }
+        val label = TextView(context).apply {
+            text = "${if (over) "O" else "U"} ${StatFormat.number(p.prop.line)} ${p.def.short}"
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val value = TextView(context).apply {
+            text = StatFormat.number(p.current) + status
+            setTextColor(color)
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val track = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(Color.parseColor("#1E2735")) }
+            val f = p.fraction.toFloat().coerceIn(0f, 1f)
+            addView(View(context).apply {
+                background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(color) }
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, f)
+            })
+            addView(View(context), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f - f))
+        }
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(8), 0, 0)
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(label)
+                addView(value)
+            }, LinearLayout.LayoutParams(dp(420), LinearLayout.LayoutParams.WRAP_CONTENT))
+            addView(track, LinearLayout.LayoutParams(dp(420), dp(6)).apply { topMargin = dp(3) })
         }
     }
 

@@ -13,6 +13,8 @@ data class Alert(
     /** Touchdowns, home runs, goals, finals, prop results: shown louder and longer. */
     val big: Boolean,
     val imageUrl: String? = null,
+    /** For a stat update on a player you've bet on: where each of their props stands now. */
+    val props: List<PropProgress> = emptyList(),
 )
 
 /** Everything fetched in one poll, keyed by game id. */
@@ -60,8 +62,8 @@ object AlertEngine {
         val alerts = mutableListOf<Alert>()
         val gameAlertsDone = mutableSetOf<String>()
         var seq = 0
-        fun add(w: WatchItem, title: String, detail: String?, big: Boolean, image: String? = null) {
-            alerts += Alert("${w.key}:$now:${seq++}", now, w.league, w.key, title, detail, big, image)
+        fun add(w: WatchItem, title: String, detail: String?, big: Boolean, image: String? = null, props: List<PropProgress> = emptyList()) {
+            alerts += Alert("${w.key}:$now:${seq++}", now, w.league, w.key, title, detail, big, image, props)
         }
 
         for (w in watchlist) {
@@ -80,7 +82,9 @@ object AlertEngine {
                     val prevHadBox = prev.boxes.containsKey(g.id)
 
                     if (newLine != null && (oldLine != null || prevHadBox)) {
-                        statAlert(w, g, oldLine, newLine)?.let { (t, d, big) -> add(w, t, d, big, w.headshot) }
+                        statAlert(w, g, oldLine, newLine)?.let { (t, d, big) ->
+                            add(w, t, d, big, w.headshot, if (w.fantasy) emptyList() else propProgress(w, newLine))
+                        }
                     }
                     if (newLine != null || g.state == GameState.POST) {
                         propAlerts(w, oldGame, g, oldLine, newLine, prevHadBox).forEach { (t, d, big) -> add(w, t, d, big, w.headshot) }
@@ -92,6 +96,12 @@ object AlertEngine {
     }
 
     private data class Msg(val title: String, val detail: String?, val big: Boolean)
+
+    /** Every prop on the player, valued from [line], in the order the user added them. */
+    fun propProgress(w: PlayerWatch, line: PlayerLine?): List<PropProgress> = w.props.mapNotNull { p ->
+        val def = StatCatalog.find(w.league, p.statId) ?: return@mapNotNull null
+        PropProgress(p, def, def.evaluate(line) ?: 0.0)
+    }
 
     private fun teamAlerts(w: TeamWatch, old: Game, g: Game): List<Msg> {
         val out = mutableListOf<Msg>()

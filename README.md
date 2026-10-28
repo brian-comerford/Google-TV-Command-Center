@@ -61,7 +61,8 @@ should pop up over it about 6 seconds later.
   After you pick a player, choose how you're following them:
   - **Fantasy**: the card leads with the live fantasy score (PPR for football, DraftKings for basketball)
     next to the live stat line, with no lines to set. Alerts include the points change, e.g. "(+5.1 PPR)".
-  - **Bets**: add over/under lines: choose the stat, set the line with the ± buttons, and choose Over or Under.
+  - **Bets**: add over/under lines: choose the stat, set the line with the ± buttons, and choose Over or Under. When
+    a bet player's stats change, the pop-up shows a progress bar for each of their props, like the card does.
 - **Phone**: link your phone and edit the list there (see below).
 - **Select a card** to edit its props, move it, move it to the top, or stop following it.
 - **Move a card**: select it, choose **Move**, then use the arrows to slide it around the grid. Press
