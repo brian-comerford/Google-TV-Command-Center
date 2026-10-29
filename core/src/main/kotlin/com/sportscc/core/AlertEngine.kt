@@ -91,6 +91,7 @@ object AlertEngine {
                     }
                 }
                 is ParlayWatch -> parlayAlerts(w, prev, next).forEach { (t, d, big) -> add(w, t, d, big) }
+                is BetWatch -> betAlerts(w, prev, next)?.let { (t, d, big) -> add(w, t, d, big, (w.leg as? PropLeg)?.headshot) }
             }
         }
         return alerts
@@ -127,6 +128,32 @@ object AlertEngine {
             }
         }
         return out
+    }
+
+    private fun betAlerts(w: BetWatch, prev: Snapshot, next: Snapshot): Msg? {
+        val a = BetEngine.evaluate(w, next)
+        val b = BetEngine.evaluate(w, prev)
+        val g = a.game
+        // A prop bet added mid-game with no box score last poll: its first numbers aren't a change.
+        val pg = g?.let { prev.games[it.id] }
+        if (w.leg is PropLeg && g != null && pg != null && pg.state != GameState.PRE && !prev.boxes.containsKey(g.id)) return null
+        if (b.status.decided || b.status == a.status) return null
+        val score = g?.let { "${it.scoreLine} · ${it.shortDetail}" }
+        val detail = listOfNotNull(score, BetEngine.describe(a).takeIf { !a.status.decided }).joinToString(" · ")
+        return when (a.status) {
+            LegStatus.WON -> Msg("BET HIT: ${a.label}", score, true)
+            LegStatus.LOST -> Msg("Bet lost: ${a.label}", score, true)
+            LegStatus.PUSH -> Msg("Bet pushed: ${a.label}", score, false)
+            // Moneylines and spreads flip back and forth with the score; overs/unders only move one way.
+            LegStatus.LIVE_WINNING -> if (b.status == LegStatus.LIVE_LOSING) Msg(flipTitle(w, true), detail, false) else null
+            LegStatus.LIVE_LOSING -> if (b.status == LegStatus.LIVE_WINNING) Msg(flipTitle(w, false), detail, false) else null
+            LegStatus.PENDING -> null
+        }
+    }
+
+    private fun flipTitle(w: BetWatch, winning: Boolean): String = when (w.leg) {
+        is SpreadLeg -> if (winning) "Now covering: ${w.displayName}" else "No longer covering: ${w.displayName}"
+        else -> if (winning) "Bet now winning: ${w.displayName}" else "Bet now losing: ${w.displayName}"
     }
 
     private fun money(d: Double): String = if (d == Math.floor(d)) "$" + d.toLong() else "$" + String.format("%.2f", d)

@@ -135,7 +135,8 @@ data class ParlayState(val watch: ParlayWatch, val legs: List<LegState>) {
         }
 }
 
-data class Settlement(val parlayKey: String, val legIndex: Int, val status: LegStatus, val final: Double?)
+/** A leg decided this poll: [watchKey] is the parlay's or single bet's key ([legIndex] is 0 for a bet). */
+data class Settlement(val watchKey: String, val legIndex: Int, val status: LegStatus, val final: Double?)
 
 object ParlayEngine {
 
@@ -148,17 +149,16 @@ object ParlayEngine {
     }
 
     fun applySettlements(p: ParlayWatch, s: List<Settlement>): ParlayWatch {
-        val mine = s.filter { it.parlayKey == p.key }.associateBy { it.legIndex }
+        val mine = s.filter { it.watchKey == p.key }.associateBy { it.legIndex }
         if (mine.isEmpty()) return p
-        return p.copy(legs = p.legs.mapIndexed { i, leg ->
-            val st = mine[i] ?: return@mapIndexed leg
-            when (leg) {
-                is PropLeg -> leg.copy(result = st.status, final = st.final)
-                is MoneylineLeg -> leg.copy(result = st.status, final = st.final)
-                is SpreadLeg -> leg.copy(result = st.status, final = st.final)
-                is TotalLeg -> leg.copy(result = st.status, final = st.final)
-            }
-        })
+        return p.copy(legs = p.legs.mapIndexed { i, leg -> mine[i]?.let { settle(leg, it) } ?: leg })
+    }
+
+    fun settle(leg: Leg, st: Settlement): Leg = when (leg) {
+        is PropLeg -> leg.copy(result = st.status, final = st.final)
+        is MoneylineLeg -> leg.copy(result = st.status, final = st.final)
+        is SpreadLeg -> leg.copy(result = st.status, final = st.final)
+        is TotalLeg -> leg.copy(result = st.status, final = st.final)
     }
 
     fun label(leg: Leg, game: Game? = null): String = when (leg) {
@@ -174,7 +174,7 @@ object ParlayEngine {
         }
     }
 
-    private fun evaluateLeg(leg: Leg, createdAt: Long, snap: Snapshot): LegState {
+    fun evaluateLeg(leg: Leg, createdAt: Long, snap: Snapshot): LegState {
         val game = gameForTeam(snap.games.values, leg.league, leg.teamId)
             ?.takeIf { g -> g.startMillis?.let { it >= createdAt - SIX_HOURS } ?: true }
         leg.result?.let { r ->

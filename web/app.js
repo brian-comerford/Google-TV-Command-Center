@@ -38,7 +38,7 @@
   const statsFor = leagueId => STATS[leagueById(leagueId).kind];
   const statShort = (leagueId, statId) => (statsFor(leagueId).find(s => s[0] === statId) || [, , statId])[2];
   const keyOf = it => it.type === 'team' ? `team:${it.league}:${it.teamId}`
-    : it.type === 'parlay' ? `parlay:${it.id}` : `player:${it.league}:${it.athleteId}`;
+    : it.type === 'parlay' ? `parlay:${it.id}` : it.type === 'bet' ? `bet:${it.id}` : `player:${it.league}:${it.athleteId}`;
   // Same wording as ParlayEngine.label on the TV.
   function legLabel(l) {
     const side = s => (s === 'UNDER' ? 'U' : 'O');
@@ -118,6 +118,13 @@
   }
   function render() {
     $('list').innerHTML = items.map((it, i) => {
+      if (it.type === 'bet') {
+        const kind = { moneyline: 'Moneyline', spread: 'Spread', total: 'Game total', prop: 'Player prop' }[it.leg.type];
+        const res = { WON: ' · hit', LOST: ' · lost', PUSH: ' · push' }[it.leg.result] || '';
+        return `<div class="item"><div class="item-head">
+          <div class="who"><div class="name">${esc(legLabel(it.leg))}</div><div class="sub"><span class="badge">BET</span> ${esc(leagueById(it.leg.league).label)} ${esc(kind)}${res}</div></div>
+          ${moveBtns(i)}<button class="x" data-remove="${i}" aria-label="Remove bet">×</button></div></div>`;
+      }
       if (it.type === 'parlay') {
         const win = toWin(it.odds, it.stake);
         const meta = [it.legs.length + ' legs', it.odds ? (it.odds > 0 ? '+' : '') + it.odds : null, it.stake ? money(it.stake) + (win ? ' to win ' + money(win) : '') : null].filter(Boolean).join(' · ');
@@ -497,7 +504,8 @@
   let propLeg = null; // set when the prop form is adding a parlay leg instead of a player's prop
   function openPropLeg(league, t, a) {
     propLeg = { type: 'prop', league: league.id, athleteId: a.id, name: a.name, teamId: t.id, teamAbbreviation: t.abbreviation, headshot: a.headshot };
-    fillPropForm('Parlay leg: ' + a.name, league.id);
+    document.querySelector('#propForm button[type=submit]').textContent = legTarget === 'bet' ? 'Add bet' : 'Add leg';
+    fillPropForm((legTarget === 'bet' ? 'Bet: ' : 'Parlay leg: ') + a.name, league.id);
     pdlg.showModal();
   }
   function fillPropForm(title, leagueId) {
@@ -509,6 +517,7 @@
   function openProp(i) {
     propFor = i;
     propLeg = null;
+    document.querySelector('#propForm button[type=submit]').textContent = 'Add prop';
     const it = items[i];
     $('propTitle').textContent = 'Add a prop: ' + it.name;
     // Fantasy points aren't offered as a line: follow the player as Fantasy instead.
@@ -560,7 +569,17 @@
     const win = toWin(parseOdds(), stake > 0 ? stake : null);
     $('parlayWin').textContent = win ? 'To win ' + money(win) : '';
   }
-  function addLeg(l) { draft.legs.push(l); renderDraft(); }
+  // Legs come from the same screens whether they're for a parlay or a single bet.
+  let legTarget = 'parlay';
+  function addLeg(l) {
+    if (legTarget === 'bet') {
+      items.push({ type: 'bet', id: Math.random().toString(36).slice(2, 10), leg: l, createdAt: Date.now() });
+      changed();
+      return;
+    }
+    draft.legs.push(l); renderDraft();
+  }
+  $('betBtn').addEventListener('click', () => { legTarget = 'bet'; legMode = true; addStack = []; push(leagueStep()); dlg.showModal(); });
   $('legList').addEventListener('click', e => {
     const b = e.target.closest('[data-unleg]'); if (!b) return;
     draft.legs.splice(+b.dataset.unleg, 1); renderDraft();
@@ -568,7 +587,7 @@
   ['parlayOdds', 'parlayStake'].forEach(id => $(id).addEventListener('input', renderDraft));
   $('parlayBtn').addEventListener('click', () => openParlay(null));
   $('parlayClose').addEventListener('click', () => pldlg.close());
-  $('addLegBtn').addEventListener('click', () => { legMode = true; addStack = []; push(leagueStep()); dlg.showModal(); });
+  $('addLegBtn').addEventListener('click', () => { legTarget = 'parlay'; legMode = true; addStack = []; push(leagueStep()); dlg.showModal(); });
   dlg.addEventListener('close', () => { if (!pldlg.open) legMode = false; });
   $('parlaySave').addEventListener('click', () => {
     if (draft.legs.length < 2) { $('parlayError').textContent = 'A parlay needs at least 2 legs.'; $('parlayError').hidden = false; return; }
@@ -585,6 +604,7 @@
   function openLegForm(kind, base, t) {
     legBase = base; legKind = kind;
     $('legTitle').textContent = kind === 'spread' ? `Spread: ${t.short}` : `Game total: ${t.short} game`;
+    document.querySelector('#legForm button[type=submit]').textContent = legTarget === 'bet' ? 'Add bet' : 'Add leg';
     $('legNumLabel').textContent = kind === 'spread' ? `Points for the ${t.short} (e.g. -3.5 favored, +3.5 underdog)` : 'Total points line';
     $('legNum').value = kind === 'spread' ? '-3.5' : '45.5';
     $('legNum').min = kind === 'spread' ? '' : '0';

@@ -64,6 +64,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import com.sportscc.core.Alert
+import com.sportscc.core.BetCard
 import com.sportscc.core.Card
 import com.sportscc.core.Competitor
 import com.sportscc.core.Dashboard
@@ -185,6 +186,7 @@ fun DashboardScreen(
                                     is TeamCard -> TeamCardView(card, mod, moving) { onCardClick(card) }
                                     is PlayerCard -> PlayerCardView(card, mod, moving) { onCardClick(card) }
                                     is ParlayCard -> ParlayCardView(card, mod, moving) { onCardClick(card) }
+                                    is BetCard -> BetCardView(card, mod, moving) { onCardClick(card) }
                                 }
                             }
                         }
@@ -387,6 +389,47 @@ private fun PlayerCardView(card: PlayerCard, modifier: Modifier, moving: Boolean
         if (card.props.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
             card.props.forEach { PropRow(it, g?.state) }
+        }
+    }
+}
+
+/** A single bet: what it is, the score, and whether it's hitting. No odds or money, by design. */
+@Composable
+private fun BetCardView(card: BetCard, modifier: Modifier, moving: Boolean, onClick: () -> Unit) {
+    val st = card.state
+    val g = card.game
+    val color = when (st.status) {
+        LegStatus.WON, LegStatus.LIVE_WINNING -> Palette.Win
+        LegStatus.LOST -> Palette.Live
+        LegStatus.LIVE_LOSING -> Palette.Warn
+        LegStatus.PUSH, LegStatus.PENDING -> Palette.Muted
+    }
+    TileCard(onClick, modifier.fillMaxWidth(), highlight = cardHighlight(g, moving)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Pill("${card.watch.league.label} ${card.watch.kind}", Palette.Accent, filled = false)
+            Spacer(Modifier.weight(1f))
+            when (st.status) {
+                LegStatus.WON -> Pill("HIT", Palette.Win)
+                LegStatus.LOST -> Pill("LOST", Palette.Live)
+                LegStatus.PUSH -> Pill("PUSH", Palette.Muted, filled = false)
+                LegStatus.PENDING -> g?.let { Pill(formatStart(it), Palette.Accent, filled = false) }
+                else -> g?.let { StatusPill(it) }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(st.label, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        g?.let {
+            Text(
+                if (it.state == GameState.PRE) "${it.away.abbreviation} @ ${it.home.abbreviation}" else it.scoreLine,
+                fontSize = 13.sp, color = Palette.Muted,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(card.description, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = color)
+        val f = st.fraction
+        if (f != null && !st.status.decided && st.status != LegStatus.PENDING) {
+            Spacer(Modifier.height(4.dp))
+            ProgressBar(f.toFloat(), color)
         }
     }
 }

@@ -165,5 +165,5 @@ dialog::backdrop { background: rgba(0, 0, 0, .6); }
 .section-head { flex-wrap: wrap; row-gap: 10px; }
 @media (max-width: 480px) {
   .section-head > .row { width: 100%; }
-  .section-head > .row .btn { flex: 1; padding-inline: 8px; }
+  .section-head > .row .btn { flex: 1; padding-inline: 6px; font-size: 14px; }
 }

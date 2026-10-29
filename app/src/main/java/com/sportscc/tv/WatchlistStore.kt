@@ -1,6 +1,8 @@
 package com.sportscc.tv
 
 import android.content.Context
+import com.sportscc.core.BetEngine
+import com.sportscc.core.BetWatch
 import com.sportscc.core.ParlayEngine
 import com.sportscc.core.ParlayWatch
 import com.sportscc.core.PlayerWatch
@@ -72,10 +74,16 @@ class WatchlistStore(context: Context) {
         saveWatchlist(_watchlist.value.sortedBy { rank[it.key] ?: Int.MAX_VALUE })
     }
 
-    /** Saves parlay legs the tracker just decided, so they stay decided after the scoreboard moves on. */
+    /** Saves parlay legs and single bets the tracker just decided, so they stay decided after the scoreboard moves on. */
     fun applySettlements(settlements: List<Settlement>) {
         if (settlements.isEmpty()) return
-        saveWatchlist(_watchlist.value.map { if (it is ParlayWatch) ParlayEngine.applySettlements(it, settlements) else it })
+        saveWatchlist(_watchlist.value.map {
+            when (it) {
+                is ParlayWatch -> ParlayEngine.applySettlements(it, settlements)
+                is BetWatch -> BetEngine.apply(it, settlements)
+                else -> it
+            }
+        })
     }
 
     fun moveToTop(key: String) {

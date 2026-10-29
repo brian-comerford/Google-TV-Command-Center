@@ -350,3 +350,59 @@ class ParlayTest {
         assertEquals(listOf<WatchItem>(parlay), SyncCodec.decode(text).items)
     }
 }
+
+class BetTest {
+    private fun games(vararg e: String) = EspnParser.parseScoreboard(Fixtures.scoreboard(*e), League.NFL).associateBy { it.id }
+    private fun snap(state: String, buf: Int, mia: Int) = Snapshot(games(Fixtures.event("401", state, "2", "BUF", buf, "15", "MIA", mia)), emptyMap())
+    private val spread = BetWatch("b1", SpreadLeg(League.NFL, "2", "BUF", -3.5))
+    private val under = BetWatch("b2", TotalLeg(League.NFL, "2", "BUF", 47.5, Prop.Side.UNDER))
+    private val ml = BetWatch("b3", MoneylineLeg(League.NFL, "15", "MIA"))
+
+    @Test
+    fun describesWhereEachBetStands() {
+        fun d(b: BetWatch, s: Snapshot) = BetEngine.describe(BetEngine.evaluate(b, s))
+        assertEquals("Covering by 3.5", d(spread, snap("in", 14, 7)))
+        assertEquals("Not covering · needs 4 more", d(spread, snap("in", 10, 10)))
+        assertEquals("24 pts · 23 to spare", d(under, snap("in", 14, 10)))
+        assertEquals("Trailing by 4", d(ml, snap("in", 14, 10)))
+        assertEquals("Hit", d(spread, snap("post", 24, 17)))
+        assertEquals("Not started", d(ml, snap("pre", 0, 0)))
+        assertEquals("BUF -3.5", spread.displayName)
+        assertEquals("SPREAD", spread.kind)
+    }
+
+    @Test
+    fun alertsOnCoverFlipsAndResultsButNotMoney() {
+        val w = listOf<WatchItem>(spread)
+        val flip = AlertEngine.diff(snap("in", 10, 7), snap("in", 14, 7), w, 1).single()
+        assertEquals("Now covering: BUF -3.5", flip.title)
+        assertFalse(flip.big)
+        assertEquals("No longer covering: BUF -3.5", AlertEngine.diff(snap("in", 14, 7), snap("in", 14, 14), w, 2).single().title)
+        val hit = AlertEngine.diff(snap("in", 21, 14), snap("post", 21, 14), w, 3).single()
+        assertEquals("BET HIT: BUF -3.5", hit.title)
+        assertTrue(hit.big)
+        assertFalse(hit.detail!!.contains("$"))
+        // The under busts the moment the total passes the line, even mid-game.
+        assertEquals("Bet lost: BUF @ MIA U 47.5", AlertEngine.diff(snap("in", 24, 21), snap("in", 31, 21), listOf(under), 4).single().title)
+    }
+
+    @Test
+    fun decodesBetsBuiltOnTheWebsite() {
+        // Captured from web/app.js: a moneyline, a spread, a game total and a player prop as single bets.
+        val bets = SyncCodec.decode(javaClass.getResource("/web-bets-payload.txt")!!.readText()).items.filterIsInstance<BetWatch>()
+        assertEquals(listOf("MONEYLINE", "SPREAD", "TOTAL", "PROP"), bets.map { it.kind })
+        assertEquals(listOf("BUF to win", "BUF -3.5", "MIA game U 47.5", "James Cook O 71.5 Rush Yds"), bets.map { it.displayName })
+    }
+
+    @Test
+    fun settlesAndKeepsTheResult() {
+        val final = snap("post", 24, 17)
+        val s = BetEngine.settlement(spread, final)!!
+        val saved = BetEngine.apply(spread, listOf(s))
+        assertEquals(LegStatus.WON, saved.leg.result)
+        val nextWeek = Snapshot(games(Fixtures.event("402", "pre", "2", "BUF", 0, "15", "MIA", 0)), emptyMap())
+        assertEquals(LegStatus.WON, BetEngine.evaluate(saved, nextWeek).status)
+        assertNull(BetEngine.settlement(saved, final))
+        assertEquals(listOf<WatchItem>(saved), SyncCodec.decode(SyncCodec.encode(SyncPayload(items = listOf(saved)))).items)
+    }
+}

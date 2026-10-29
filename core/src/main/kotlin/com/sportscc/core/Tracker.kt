@@ -37,6 +37,10 @@ data class Dashboard(
 
 data class ParlayCard(override val watch: ParlayWatch, override val game: Game?, val state: ParlayState) : Card
 
+data class BetCard(override val watch: BetWatch, override val game: Game?, val state: LegState) : Card {
+    val description: String get() = BetEngine.describe(state)
+}
+
 /** [settlements]: parlay legs decided this poll, for the app to save onto the stored parlay. */
 data class RefreshResult(val dashboard: Dashboard, val alerts: List<Alert>, val settlements: List<Settlement> = emptyList())
 
@@ -58,6 +62,7 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
         val prev = previous
 
         val leagues = watchlist.flatMap { w -> if (w is ParlayWatch) w.legs.map { it.league } else listOf(w.league) }.distinct()
+        // (BetWatch.league is its leg's league, so the line above covers single bets.)
         val scoreboards = leagues.map { league ->
             async {
                 league to runCatching { client.scoreboard(league) }
@@ -79,6 +84,7 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
             when (w) {
                 is PlayerWatch -> listOf(w.league to w.teamId)
                 is ParlayWatch -> w.legs.filter { it is PropLeg && it.result == null }.map { it.league to it.teamId }
+                is BetWatch -> if (w.leg is PropLeg && w.leg.result == null) listOf(w.league to w.leg.teamId) else emptyList()
                 else -> emptyList()
             }
         }
@@ -106,7 +112,8 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
         previous = snapshot
 
         val settlements = watchlist.filterIsInstance<ParlayWatch>()
-            .flatMap { ParlayEngine.settlements(ParlayEngine.evaluate(it, snapshot)) }
+            .flatMap { ParlayEngine.settlements(ParlayEngine.evaluate(it, snapshot)) } +
+            watchlist.filterIsInstance<BetWatch>().mapNotNull { BetEngine.settlement(it, snapshot) }
         RefreshResult(buildDashboard(watchlist, snapshot, now, errors), alerts, settlements)
     }
 
@@ -115,6 +122,10 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
             val cards = watchlist.map { w ->
                 when (w) {
                     is TeamWatch -> TeamCard(w, gameForTeam(snap.games.values, w.league, w.teamId))
+                    is BetWatch -> {
+                        val state = BetEngine.evaluate(w, snap)
+                        BetCard(w, state.game, state)
+                    }
                     is ParlayWatch -> {
                         val state = ParlayEngine.evaluate(w, snap)
                         // The card's "game" decides live highlighting and live-first sorting.

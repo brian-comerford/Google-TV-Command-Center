@@ -81,6 +81,13 @@ GitHub Pages: `https://brian-comerford.github.io/Google-TV-Command-Center/`.
 3. Add teams and players, type your prop lines, and tap **Send to TV**. The TV picks up the new list
    within about 20 seconds (about 3 seconds while the Phone screen is open). It replaces the list on the TV.
 
+**+ Bet** adds a single (straight) bet: a moneyline, spread, game total over/under or player prop.
+On the TV it gets its own card showing the bet, the score and where it stands ("Covering by 3.5",
+"Not covering · needs 4 more", "41 pts · 6 to spare"), then HIT, LOST or PUSH. There are no odds or
+payouts, just whether it hit. Alerts fire when a spread or moneyline flips between winning and losing
+("Now covering: BUF -3.5"), and when the bet is decided ("BET HIT", "Bet lost", "Bet pushed"). Like
+parlay legs, the result is saved once decided.
+
 **+ Parlay** builds a parlay from any mix of legs: player props, moneylines, spreads and game totals,
 with optional odds and stake to show what it pays. On the TV, the parlay card lists every leg with ✓ hit,
 ✗ lost, ● live (green winning / amber losing) or ○ not started, plus progress bars on prop and total legs,

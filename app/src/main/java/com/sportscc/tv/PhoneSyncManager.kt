@@ -3,6 +3,7 @@ package com.sportscc.tv
 import android.content.Context
 import android.util.Log
 import com.sportscc.core.Alert
+import com.sportscc.core.BetWatch
 import com.sportscc.core.League
 import com.sportscc.core.PairingCode
 import com.sportscc.core.ParlayWatch
@@ -123,7 +124,8 @@ class PhoneSyncManager(context: Context, private val store: WatchlistStore, priv
                 id = "sync:$now", time = now, league = p.items.firstOrNull()?.league ?: League.NFL, watchKey = "sync",
                 title = "Updated from your phone",
                 detail = "$teams teams · ${players.size} players · $props props" +
-                    p.items.count { it is ParlayWatch }.let { if (it > 0) " · $it parlays" else "" },
+                    p.items.count { it is ParlayWatch }.let { if (it > 0) " · $it parlays" else "" } +
+                    p.items.count { it is BetWatch }.let { if (it > 0) " · $it bets" else "" },
                 big = false,
             ),
         )
