@@ -43,7 +43,10 @@ jobs:
           target_commitish: ${{ github.sha }}
           make_latest: true
           files: SportsCommandCenter.apk
+          # The app shows the "What's new:" line in its update notice (core Updates.whatsNew).
           body: |
+            What's new: ${{ github.event.head_commit.message }}
+
             Built from ${{ github.ref_name }} @ ${{ github.sha }}.
             Install on Google TV: open the Downloader app and enter
             https://github.com/${{ github.repository }}/releases/latest/download/SportsCommandCenter.apk

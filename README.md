@@ -37,6 +37,13 @@ Typing that link with the remote is slow. Instead, open the phone website (below
 **Install or update the TV app** and tap **Copy**. Then paste the link into Downloader with the keyboard in
 the Google TV app on your phone. The TV app's **Settings** also shows the link and your installed version.
 
+### Updates
+Once this version is installed, the app checks for a newer build when you open it and every few hours.
+When there is one, it says so in the Live Feed (and over other apps if alerts are on) and shows an
+**Update available** strip on the home screen. **Update now** downloads it and opens the installer. The first
+time, the TV may ask you to allow installs from Sports Command Center. **Later** hides the strip until you
+next open the app. **Settings → Check for updates** checks right away.
+
 ### 2b. With a computer (ADB)
 1. Turn on developer mode as in step 1 above. Then go to **Settings → System → Developer options** and
    turn on **USB debugging** (on Google TV this also allows network ADB).

@@ -16,6 +16,8 @@ class SccApp : Application() {
         private set
     lateinit var streams: com.sportscc.tv.stream.StreamStore
         private set
+    lateinit var updates: UpdateManager
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -24,6 +26,8 @@ class SccApp : Application() {
         streams = com.sportscc.tv.stream.StreamStore(this)
         engine = TrackerEngine(store)
         sync = PhoneSyncManager(this, store) { engine.notify(it) }
+        updates = UpdateManager(this) { engine.notify(it) }
+        updates.start()
         MainScope().launch {
             engine.active.collect { if (it) sync.start() else sync.stop() }
         }

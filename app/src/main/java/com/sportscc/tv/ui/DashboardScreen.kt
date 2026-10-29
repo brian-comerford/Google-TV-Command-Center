@@ -2,6 +2,8 @@
 
 package com.sportscc.tv.ui
 
+import com.sportscc.core.ReleaseInfo
+import com.sportscc.tv.UpdateState
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.items
@@ -107,6 +109,11 @@ fun DashboardScreen(
     onCardClick: (Card) -> Unit,
     onMoveDone: (List<String>) -> Unit,
     onMoveCancel: () -> Unit,
+    /** A newer version of the app, if one was found (and not put off with Later). */
+    update: ReleaseInfo? = null,
+    updateState: UpdateState = UpdateState.Idle,
+    onUpdate: () -> Unit = {},
+    onUpdateLater: () -> Unit = {},
 ) {
     val addFocus = remember { FocusRequester() }
     val requesters = remember { mutableMapOf<String, FocusRequester>() }
@@ -137,6 +144,7 @@ fun DashboardScreen(
                 FocusButton("Refresh", onRefresh, Modifier.padding(start = 8.dp))
                 FocusButton("Settings", onSettings, Modifier.padding(start = 8.dp))
             }
+            if (update != null) UpdateBanner(update, updateState, onUpdate, onUpdateLater)
             Spacer(Modifier.height(14.dp))
 
             Row(Modifier.weight(1f)) {
@@ -586,6 +594,36 @@ private fun FeedRow(a: Alert) {
             Text(a.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
             a.detail?.let { Text(it, fontSize = 11.sp, color = Palette.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis) }
         }
+    }
+}
+
+/** "Update available" strip under the top bar. */
+@Composable
+fun UpdateBanner(update: ReleaseInfo, state: UpdateState, onUpdate: () -> Unit, onLater: () -> Unit) {
+    Row(
+        Modifier
+            .padding(top = 12.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Palette.Accent.copy(alpha = 0.22f))
+            .border(1.dp, Palette.Accent, RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Update available: version ${update.version}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
+            Text(
+                when (state) {
+                    is UpdateState.Downloading -> "Downloading… ${state.percent}%"
+                    is UpdateState.Failed -> state.message
+                    else -> update.whatsNew?.let { "What's new: $it" } ?: "Update now installs it over this version and keeps your list."
+                },
+                fontSize = 13.sp, color = if (state is UpdateState.Failed) Palette.Warn else Palette.Muted,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        FocusButton(if (state is UpdateState.Downloading) "Downloading…" else "Update now", onUpdate, Modifier.padding(start = 8.dp), accent = Palette.Win)
+        FocusButton("Later", onLater, Modifier.padding(start = 8.dp))
     }
 }
 

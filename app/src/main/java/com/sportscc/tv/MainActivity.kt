@@ -71,11 +71,13 @@ class MainActivity : ComponentActivity() {
         scc.engine.uiVisible.value = true
         scc.engine.acquire()
         syncService()
+        scc.updates.dismissed.value = false // "Later" lasts until you next open the app
     }
 
     override fun onResume() {
         super.onResume()
         overlayAllowed.value = Settings.canDrawOverlays(this)
+        scc.updates.checkSoon()
     }
 
     override fun onStop() {
@@ -118,6 +120,9 @@ class MainActivity : ComponentActivity() {
         val feed by engine.feed.collectAsStateWithLifecycle()
         val watchlist by store.watchlist.collectAsStateWithLifecycle()
         val settings by store.settings.collectAsStateWithLifecycle()
+        val update by scc.updates.available.collectAsStateWithLifecycle()
+        val updateState by scc.updates.state.collectAsStateWithLifecycle()
+        val updateDismissed by scc.updates.dismissed.collectAsStateWithLifecycle()
 
         val stack = remember { mutableStateListOf<Screen>(Screen.Home) }
         fun push(s: Screen) = stack.add(s)
@@ -198,6 +203,10 @@ class MainActivity : ComponentActivity() {
                     movingKey = null
                 },
                 onMoveCancel = { movingKey = null },
+                update = update.takeUnless { updateDismissed },
+                updateState = updateState,
+                onUpdate = { scc.updates.install() },
+                onUpdateLater = { scc.updates.dismissed.value = true },
             )
 
             Screen.Leagues -> LeaguePickerScreen { push(Screen.Teams(it)) }
@@ -334,6 +343,10 @@ class MainActivity : ComponentActivity() {
 
             Screen.Settings -> SettingsScreen(
                 appVersion = BuildConfig.VERSION_NAME,
+                update = update,
+                updateState = updateState,
+                onCheckUpdate = { scc.updates.checkSoon(force = true) },
+                onUpdate = { scc.updates.install() },
                 apkUrl = BuildConfig.APK_URL,
                 onCopyApkUrl = { copyToClipboard(BuildConfig.APK_URL) },
                 settings = settings,

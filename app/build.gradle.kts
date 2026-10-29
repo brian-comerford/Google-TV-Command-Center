@@ -26,6 +26,8 @@ android {
             "String", "APK_URL",
             "\"https://github.com/${repo[0]}/${repo[1]}/releases/latest/download/SportsCommandCenter.apk\"",
         )
+        // Where the app checks for a newer build.
+        buildConfigField("String", "RELEASES_API", "\"https://api.github.com/repos/${repo[0]}/${repo[1]}/releases/latest\"")
     }
 
     signingConfigs {

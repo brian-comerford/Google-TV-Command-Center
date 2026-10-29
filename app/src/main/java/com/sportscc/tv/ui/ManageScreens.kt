@@ -2,6 +2,10 @@
 
 package com.sportscc.tv.ui
 
+import com.sportscc.core.ReleaseInfo
+import com.sportscc.tv.UpdateState
+import java.text.DateFormat
+import java.util.Date
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -197,6 +201,10 @@ fun SettingsScreen(
     appVersion: String,
     apkUrl: String,
     onCopyApkUrl: () -> Unit,
+    update: ReleaseInfo? = null,
+    updateState: UpdateState = UpdateState.Idle,
+    onCheckUpdate: () -> Unit = {},
+    onUpdate: () -> Unit = {},
 ) = ScreenFrame {
     Column(Modifier.verticalScroll(rememberScrollState())) {
         ScreenTitle("Settings")
@@ -270,7 +278,30 @@ fun SettingsScreen(
         Hint("Fires 6 seconds after you press it: press Home and open another app to see it pop up on top.")
 
         SectionLabel("Install or update the app")
-        Text("You have version $appVersion. To get the newest one, open Downloader and enter:", fontSize = 14.sp, color = Palette.Text)
+        Text(
+            when {
+                updateState is UpdateState.Downloading -> "Downloading version ${update?.version ?: "update"}… ${updateState.percent}%"
+                update != null -> "Version ${update.version} is available (you have $appVersion)." + (update.whatsNew?.let { " What's new: $it" } ?: "")
+                updateState is UpdateState.Checking -> "You have version $appVersion. Checking for updates…"
+                updateState is UpdateState.UpToDate ->
+                    "You have version $appVersion, the newest (checked ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(updateState.checkedAt))})."
+                else -> "You have version $appVersion."
+            },
+            fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (update != null) Palette.Win else Palette.Text,
+        )
+        if (updateState is UpdateState.Failed) Text(updateState.message, fontSize = 13.sp, color = Palette.Warn)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (update != null) FocusButton("Update now", onUpdate, accent = Palette.Win)
+            FocusButton("Check for updates", onCheckUpdate)
+        }
+        Hint(
+            "The app checks for a new version when you open it and every few hours, and tells you when there is one. " +
+                "Update now downloads it and opens the installer; the first time, the TV may ask you to allow installs " +
+                "from Sports Command Center. Your list is kept.",
+        )
+        Spacer(Modifier.height(10.dp))
+        Text("Or install it with Downloader, using this link:", fontSize = 14.sp, color = Palette.Text)
         Spacer(Modifier.height(6.dp))
         Text(apkUrl, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Palette.Accent)
         Spacer(Modifier.height(8.dp))
