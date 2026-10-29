@@ -1,6 +1,9 @@
 package com.sportscc.core
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -128,6 +131,37 @@ class Relay(private val base: String = "https://ntfy.sh", private val timeoutMs:
                 )
             }
             .lastOrNull()
+    }
+}
+
+/**
+ * The same messages go through several relays at once, so phone sync keeps working when one of them
+ * is down or can't be reached from your network. ntfy.sh is the official server; the others are
+ * community-run ntfy servers (same API). The phone website (web/app.js) uses the same list.
+ */
+class Relays(val bases: List<String> = DEFAULT, timeoutMs: Int = 10_000) {
+    private val relays = bases.map { it to Relay(it, timeoutMs) }
+
+    /** Posts to every relay; fine as long as one of them took it. Returns how many did. */
+    suspend fun publish(topic: String, body: String): Int = coroutineScope {
+        val results = relays.map { (_, r) -> async { runCatching { r.publish(topic, body) } } }.awaitAll()
+        val ok = results.count { it.isSuccess }
+        if (ok == 0) throw results.first().exceptionOrNull() ?: IOException("No relay answered")
+        ok
+    }
+
+    /**
+     * The newest message on each relay that has one, as (relay, message). [since] gives each relay's
+     * "since" value (its last message id, a duration or a Unix time). Throws only if no relay answered.
+     */
+    suspend fun poll(topic: String, since: (String) -> String): List<Pair<String, RelayMessage>> = coroutineScope {
+        val results = relays.map { (base, r) -> async { base to runCatching { r.latest(topic, null, since(base)) } } }.awaitAll()
+        if (results.all { it.second.isFailure }) throw results.first().second.exceptionOrNull() ?: IOException("No relay answered")
+        results.mapNotNull { (base, res) -> res.getOrNull()?.let { base to it } }
+    }
+
+    companion object {
+        val DEFAULT = listOf("https://ntfy.sh", "https://ntfy.envs.net", "https://ntfy.adminforge.de", "https://ntfy.hostux.net")
     }
 }
 

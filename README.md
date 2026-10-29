@@ -131,10 +131,13 @@ filterable by confidence. Tick the ones you bet and they're added with their lin
 nflverse player ids, so players are matched to ESPN rosters by name and team (checking every roster
 in case of a trade); anyone it can't match is listed so you can add them by hand.
 
-The phone and TV pass the list through [ntfy.sh](https://ntfy.sh), a free public message relay, on a
-channel named after the TV's code. There are no accounts. Anyone who knew your code could send your TV
+The phone and TV pass the list through free public message relays, on a channel named after the TV's
+code. Every message goes through [ntfy.sh](https://ntfy.sh) and three community-run ntfy servers
+(ntfy.envs.net, ntfy.adminforge.de, ntfy.hostux.net) at once, so sync keeps working if one is down or
+blocked on your network. If sync stops, **Actions → Relay check → Run workflow** shows which relays are
+up. There are no accounts. Anyone who knew your code could send your TV
 a list, so **New code** on the TV's Phone screen unlinks every phone. Messages are only kept on the
-relay for 12 hours, but both the TV and the phone keep their own copy of the list.
+relays for about 12 hours, but both the TV and the phone keep their own copy of the list.
 
 **One-time setup:** in the repo on GitHub, go to **Settings → Pages** and set **Source** to
 **GitHub Actions**. After that, the *Phone website* workflow publishes `web/` on every push to the

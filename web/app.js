@@ -4,7 +4,56 @@
 (function () {
   'use strict';
 
-  const RELAY = 'https://ntfy.sh';
+  // Every message goes through all of these relays at once (the TV app uses the same list, see Relays
+  // in core/.../PhoneSync.kt), so sync keeps working when one is down or blocked on your network.
+  // ntfy.sh is the official server; the others are community-run ntfy servers.
+  const RELAYS = ['https://ntfy.sh', 'https://ntfy.envs.net', 'https://ntfy.adminforge.de', 'https://ntfy.hostux.net'];
+  const host = base => base.replace('https://', '');
+
+  // fetch() has no time limit of its own: without one a stalled request says "Sending…" forever.
+  async function fetchWithin(ms, url, opts) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), ms);
+    try {
+      return await fetch(url, Object.assign({}, opts, { signal: ctl.signal }));
+    } catch (e) {
+      throw ctl.signal.aborted ? new Error('no answer') : e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  // One relay: POST, and if that stalls or fails, the relay's GET form for short messages
+  // (<relay>/<topic>/publish?message=…), which some networks and browsers handle better.
+  async function postOne(base, topic, body) {
+    let err;
+    try {
+      const r = await fetchWithin(10000, `${base}/${topic}`, { method: 'POST', body });
+      if (r.ok) return;
+      err = new Error('HTTP ' + r.status);
+    } catch (e) { err = e; }
+    if (body.length > 1500) throw err;
+    const r = await fetchWithin(10000, `${base}/${topic}/publish?message=${encodeURIComponent(body)}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  }
+  // Sent if at least one relay took it.
+  async function publishAll(topic, body) {
+    const results = await Promise.allSettled(RELAYS.map(base => postOne(base, topic, body)));
+    if (results.some(r => r.status === 'fulfilled')) return;
+    throw new Error('no relay answered (' + results.map((r, i) => `${host(RELAYS[i])}: ${r.reason && r.reason.message}`).join('; ') + ')');
+  }
+  // The newest message on the topic across all relays, or null.
+  async function newestOnAll(topic, since) {
+    const results = await Promise.allSettled(RELAYS.map(async base => {
+      const r = await fetchWithin(10000, `${base}/${topic}/json?poll=1&since=${since}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return (await r.text()).split('\n').filter(Boolean)
+        .map(l => { try { return JSON.parse(l); } catch (e) { return null; } })
+        .filter(m => m && m.event === 'message').pop() || null;
+    }));
+    if (!results.some(r => r.status === 'fulfilled')) throw new Error('no relay answered');
+    return results.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value)
+      .sort((a, b) => a.time - b.time).pop() || null;
+  }
   const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 
   const { LEAGUES, teamsUrl, rosterUrl, parseTeams, parseRoster } = window.EspnShared;
@@ -205,10 +254,7 @@
   async function loadFromTv() {
     const s = $('loadStatus'); s.hidden = false; s.textContent = 'Looking for the TV\'s list…';
     try {
-      const r = await fetch(`${RELAY}/${topicTv(code)}/json?poll=1&since=12h`);
-      if (!r.ok) throw new Error('relay returned ' + r.status);
-      const lines = (await r.text()).split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } });
-      const msg = lines.filter(m => m && m.event === 'message').pop();
+      const msg = await newestOnAll(topicTv(code), '12h');
       if (!msg) { s.textContent = 'Nothing from the TV yet. Open Sports Command Center on the TV and try again.'; return; }
       const payload = await decode(msg.message);
       items = (payload.items || []).map(it => it.type === 'player' ? Object.assign({ props: [] }, it) : it);
@@ -228,8 +274,7 @@
     try {
       const body = await encode({ v: 1, items, sentAt: Date.now() });
       if (body.length > 4000) throw new Error('the list is too long for one message. Remove a few items and try again.');
-      const r = await fetch(`${RELAY}/${topicIn(code)}`, { method: 'POST', body });
-      if (!r.ok) throw new Error('relay returned ' + r.status);
+      await publishAll(topicIn(code), body);
       dirty = false; lastSent = Date.now(); store.set('lastSent', lastSent); save();
       renderStatus();
     } catch (e) {
@@ -616,37 +661,12 @@
   function renderRecent() {
     $('openRecent').innerHTML = recent.map((r, i) => `<button type="button" class="chip-btn" data-recent="${i}">${esc(r.length > 34 ? r.slice(0, 33) + '…' : r)}</button>`).join('');
   }
-  // fetch() has no time limit of its own: without one a stalled request says "Sending…" forever.
-  async function fetchWithin(ms, url, opts) {
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), ms);
-    try {
-      return await fetch(url, Object.assign({}, opts, { signal: ctl.signal }));
-    } catch (e) {
-      throw ctl.signal.aborted ? new Error('the relay didn\'t answer') : e;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  // Post a short message to the TV. If the normal POST stalls or fails, try the relay's GET form
-  // (ntfy.sh/<topic>/publish?message=…), which some networks and browsers handle better.
-  async function postToTv(topic, text) {
-    try {
-      const r = await fetchWithin(10000, `${RELAY}/${topic}`, { method: 'POST', body: text });
-      if (r.ok) return;
-      if (r.status === 429) throw new Error('the relay says too many messages; wait a minute');
-    } catch (e) {
-      if (/too many/.test(e.message)) throw e;
-    }
-    const r = await fetchWithin(10000, `${RELAY}/${topic}/publish?message=${encodeURIComponent(text)}`, { cache: 'no-store' });
-    if (!r.ok) throw new Error('relay returned ' + r.status);
-  }
   async function openOnTv(text) {
     text = text.trim();
     if (!text || !code) return;
     $('openStatus').textContent = 'Sending…';
     try {
-      await postToTv(topicOpen(code), text);
+      await publishAll(topicOpen(code), text);
       recent = [text].concat(recent.filter(x => x !== text)).slice(0, 6);
       store.set('recentOpen', recent); renderRecent();
       $('openStatus').textContent = /\.m3u8?(\?|#|\||$)/i.test(text)
@@ -675,8 +695,17 @@
     if (text.length > 15e6) { $('openStatus').textContent = 'That playlist is too big to send (over 15 MB).'; return; }
     $('openStatus').textContent = 'Sending…';
     try {
-      const r = await fetchWithin(60000, `${RELAY}/${topicOpen(code)}?filename=${encodeURIComponent(file.name || 'playlist.m3u')}`, { method: 'POST', body: text });
-      if (!r.ok) throw new Error('relay returned ' + r.status);
+      // A file goes through one relay (the first that takes it), so the TV gets one copy.
+      const errors = [];
+      let sent = false;
+      for (const base of RELAYS) {
+        try {
+          const r = await fetchWithin(60000, `${base}/${topicOpen(code)}?filename=${encodeURIComponent(file.name || 'playlist.m3u')}`, { method: 'POST', body: text });
+          if (r.ok) { sent = true; break; }
+          errors.push(`${host(base)}: HTTP ${r.status}`);
+        } catch (err) { errors.push(`${host(base)}: ${err.message}`); }
+      }
+      if (!sent) throw new Error('no relay answered (' + errors.join('; ') + ')');
       const n = (text.match(/#EXTINF/gi) || []).length;
       $('openStatus').textContent = `Sent ${n} channels. The TV adds them in a few seconds (the TV app needs to be open).`;
     } catch (err) {
