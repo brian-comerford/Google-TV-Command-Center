@@ -7,6 +7,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -162,47 +164,52 @@ fun WatchScreen(
     val showRight = layout == BrowserLayout.FRAMED || layout == BrowserLayout.RIGHT
     val showBottom = layout == BrowserLayout.FRAMED || layout == BrowserLayout.BOTTOM
 
-    Box(Modifier.fillMaxSize().background(Palette.Bg)) {
-        Row(Modifier.fillMaxSize()) {
+    // Older TVs crop the picture edges (overscan), so keep everything inside a safe margin.
+    Box(Modifier.fillMaxSize().background(Palette.Bg).padding(horizontal = 30.dp, vertical = 16.dp)) {
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 // ---- toolbar ----
+                // Scrolls sideways if it runs out of room, so no button ever gets squeezed.
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .horizontalScroll(rememberScrollState())
+                        .padding(bottom = 4.dp)
                         .onPreviewKeyEvent { e ->
                             if (e.key == Key.DirectionDown && e.type == KeyEventType.KeyDown) {
                                 browser.requestFocus(); true
                             } else false
                         },
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    FocusButton("Back", { if (!browser.goBack()) onExit() }, Modifier.focusRequester(toolbarFocus))
-                    FocusButton("Search / URL", { dialog = "open" })
-                    FocusButton("Saved", { dialog = "saved" })
-                    FocusButton("Save", { onSave(SavedSite(title?.takeIf { it.isNotBlank() } ?: url, url)) })
-                    FocusButton("Reload", { browser.reload() })
-                    FocusButton(if (pointer) "Pointer" else "Scroll", { pointer = !pointer }, selected = true)
-                    FocusButton(if (desktop) "Desktop site" else "Mobile site", { onDesktop(!desktop) })
-                    FocusButton(layout.label, { onLayout(layout.next()) })
-                    FocusButton("Exit", onExit, accent = Palette.Live)
-                    Text(
-                        title?.takeIf { it.isNotBlank() } ?: url, fontSize = 12.sp, color = Palette.Muted,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = 6.dp),
-                    )
+                    FocusButton("Back", { if (!browser.goBack()) onExit() }, Modifier.focusRequester(toolbarFocus), compact = true)
+                    FocusButton("Search", { dialog = "open" }, compact = true)
+                    FocusButton("Saved", { dialog = "saved" }, compact = true)
+                    FocusButton("Save", { onSave(SavedSite(title?.takeIf { it.isNotBlank() } ?: url, url)) }, compact = true)
+                    FocusButton("Reload", { browser.reload() }, compact = true)
+                    FocusButton(if (pointer) "Pointer" else "Scroll", { pointer = !pointer }, selected = true, compact = true)
+                    FocusButton(if (desktop) "Desktop" else "Mobile", { onDesktop(!desktop) }, compact = true)
+                    FocusButton("Layout", { onLayout(layout.next()) }, compact = true)
+                    FocusButton("Exit", onExit, accent = Palette.Live, compact = true)
                 }
+                Text(
+                    listOfNotNull(title?.takeIf { it.isNotBlank() }, url.takeIf { it.startsWith("http") }).joinToString("  ·  ")
+                        .ifBlank { url } + "   ·   Layout: ${layout.label}",
+                    fontSize = 11.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 2.dp, bottom = 3.dp),
+                )
                 Box(Modifier.fillMaxWidth().height(2.dp)) {
                     if (progress in 1..99) ProgressBar(progress / 100f, Palette.Accent, Modifier.height(2.dp))
                 }
                 // The browser stays in the same place in the tree whatever the layout, so it's never rebuilt.
-                AndroidView(factory = { browser }, modifier = Modifier.weight(1f).fillMaxWidth())
+                AndroidView(factory = { browser }, modifier = Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(6.dp)))
                 if (showBottom) BottomTicker(cards, feed)
             }
-            if (showRight) SidePanel(cards, Modifier.width(272.dp).fillMaxHeight())
+            if (showRight) SidePanel(cards, Modifier.width(250.dp).fillMaxHeight())
         }
 
-        AlertBanner(banner, Modifier.align(Alignment.TopEnd).padding(top = 54.dp, end = 12.dp), width = 380.dp)
+        AlertBanner(banner, Modifier.align(Alignment.TopEnd).padding(top = 40.dp), width = 360.dp)
 
         when (dialog) {
             "open" -> OpenDialog(
@@ -234,7 +241,7 @@ private fun BottomTicker(cards: List<Card>, feed: List<Alert>) {
     val text = listOf(scores, news).filter { it.isNotBlank() }.joinToString("     |     ")
         .ifBlank { "Scores and updates for your picks scroll here during games." }
     Row(
-        Modifier.fillMaxWidth().height(46.dp).background(Palette.Panel).padding(horizontal = 12.dp),
+        Modifier.padding(top = 8.dp).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(10.dp)).background(Palette.Panel).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (cards.any { it.game?.state == GameState.IN }) {
@@ -250,7 +257,7 @@ private fun BottomTicker(cards: List<Card>, feed: List<Alert>) {
 
 @Composable
 private fun SidePanel(cards: List<Card>, modifier: Modifier) {
-    Column(modifier.background(Palette.Panel).padding(10.dp)) {
+    Column(modifier.clip(RoundedCornerShape(12.dp)).background(Palette.Panel).padding(10.dp)) {
         Text("YOUR CARDS", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Palette.Muted, letterSpacing = 1.5.sp)
         Spacer(Modifier.height(8.dp))
         if (cards.isEmpty()) Text("Add teams, players and bets from the home screen or your phone.", fontSize = 12.sp, color = Palette.Muted)

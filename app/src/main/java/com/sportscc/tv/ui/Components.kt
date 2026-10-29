@@ -62,6 +62,8 @@ fun FocusButton(
     selected: Boolean = false,
     accent: Color = Palette.Accent,
     big: Boolean = false,
+    /** Small, single-line button for dense toolbars; it never wraps or squeezes its label. */
+    compact: Boolean = false,
 ) {
     Surface(
         onClick = onClick,
@@ -80,9 +82,14 @@ fun FocusButton(
     ) {
         Text(
             text,
-            modifier = Modifier.padding(horizontal = if (big) 24.dp else 16.dp, vertical = if (big) 16.dp else 9.dp),
-            fontSize = if (big) 18.sp else 14.sp,
+            modifier = Modifier.padding(
+                horizontal = if (big) 24.dp else if (compact) 11.dp else 16.dp,
+                vertical = if (big) 16.dp else if (compact) 6.dp else 9.dp,
+            ),
+            fontSize = if (big) 18.sp else if (compact) 12.sp else 14.sp,
             fontWeight = FontWeight.SemiBold,
+            maxLines = if (compact) 1 else Int.MAX_VALUE,
+            softWrap = !compact,
         )
     }
 }
