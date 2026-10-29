@@ -1,0 +1,22 @@
+name: Relay check
+
+# Run by hand (Actions -> Relay check -> Run workflow) to see which phone-sync relays are reachable
+# and accept a message from a web page (CORS), as the phone website needs.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check relays
+        run: |
+          topic="scc-relay-check-$RANDOM$RANDOM"
+          for h in ntfy.sh ntfy.envs.net ntfy.adminforge.de ntfy.tedomum.fr ntfy.jae.fi ntfy.hostux.net ntfy.mzte.de ntfy.fossman.de; do
+            health=$(curl -s -m 15 -o /dev/null -w '%{http_code}' "https://$h/v1/health" || echo fail)
+            pub=$(curl -s -m 15 -o /dev/null -w '%{http_code}' -H 'Origin: https://example.github.io' -d "hello" "https://$h/$topic" || echo fail)
+            cors=$(curl -s -m 15 -D - -o /dev/null -H 'Origin: https://example.github.io' "https://$h/$topic/json?poll=1&since=1h" | tr -d '\r' | grep -i '^access-control-allow-origin' || echo none)
+            got=$(curl -s -m 15 "https://$h/$topic/json?poll=1&since=1h" | grep -c '"hello"' || true)
+            att=$(printf '#EXTM3U\n' | curl -s -m 15 -o /dev/null -w '%{http_code}' -X POST --data-binary @- "https://$h/$topic?filename=t.m3u" || echo fail)
+            echo "$h health=$health publish=$pub read=$got cors=[$cors] attachment=$att"
+          done
