@@ -194,12 +194,13 @@ class BrowserView(context: Context) : FrameLayout(context) {
             if (mode == Mode.POINTER && event.repeatCount == 0) click(cx, cy)
             return true
         }
+        val held = event.repeatCount > 0
         if (mode == Mode.SCROLL) {
             when (code) {
-                KeyEvent.KEYCODE_DPAD_UP -> if (!webView.canScrollVertically(-1) && customView == null) onExitTop?.invoke() else swipe(0f, height * 0.35f)
-                KeyEvent.KEYCODE_DPAD_DOWN -> swipe(0f, -height * 0.35f)
-                KeyEvent.KEYCODE_DPAD_LEFT -> swipe(width * 0.35f, 0f)
-                KeyEvent.KEYCODE_DPAD_RIGHT -> swipe(-width * 0.35f, 0f)
+                KeyEvent.KEYCODE_DPAD_UP -> scroll(0f, -0.35f, held, exitIfStuck = true)
+                KeyEvent.KEYCODE_DPAD_DOWN -> scroll(0f, 0.35f, held)
+                KeyEvent.KEYCODE_DPAD_LEFT -> scroll(-0.35f, 0f, held)
+                KeyEvent.KEYCODE_DPAD_RIGHT -> scroll(0.35f, 0f, held)
             }
             return true
         }
@@ -207,12 +208,10 @@ class BrowserView(context: Context) : FrameLayout(context) {
         val step = density * min(14f + event.repeatCount * 6f, 60f)
         val edge = density * 4
         when (code) {
-            KeyEvent.KEYCODE_DPAD_UP -> if (cy <= edge) {
-                if (!webView.canScrollVertically(-1) && customView == null) onExitTop?.invoke() else swipe(0f, height * 0.25f)
-            } else cy = max(0f, cy - step)
-            KeyEvent.KEYCODE_DPAD_DOWN -> if (cy >= height - edge) swipe(0f, -height * 0.25f) else cy = min(height.toFloat(), cy + step)
-            KeyEvent.KEYCODE_DPAD_LEFT -> if (cx <= edge) swipe(width * 0.25f, 0f) else cx = max(0f, cx - step)
-            KeyEvent.KEYCODE_DPAD_RIGHT -> if (cx >= width - edge) swipe(-width * 0.25f, 0f) else cx = min(width.toFloat(), cx + step)
+            KeyEvent.KEYCODE_DPAD_UP -> if (cy <= edge) scroll(0f, -0.2f, held, exitIfStuck = true) else cy = max(0f, cy - step)
+            KeyEvent.KEYCODE_DPAD_DOWN -> if (cy >= height - edge) scroll(0f, 0.2f, held) else cy = min(height.toFloat(), cy + step)
+            KeyEvent.KEYCODE_DPAD_LEFT -> if (cx <= edge) scroll(-0.2f, 0f, held) else cx = max(0f, cx - step)
+            KeyEvent.KEYCODE_DPAD_RIGHT -> if (cx >= width - edge) scroll(0.2f, 0f, held) else cx = min(width.toFloat(), cx + step)
         }
         cursor.moveTo(cx, cy)
         return true
@@ -227,16 +226,24 @@ class BrowserView(context: Context) : FrameLayout(context) {
         send(MotionEvent.ACTION_UP, t, t + 60, x, y)
     }
 
-    /** Scrolls like a finger drag, so it also works inside scrollable boxes on the page. */
-    private fun swipe(dx: Float, dy: Float) {
-        val x = if (cx >= 0) cx else width / 2f
-        val y = if (cy >= 0) cy else height / 2f
-        val sx = (x - dx / 2).coerceIn(1f, width - 1f)
-        val sy = (y - dy / 2).coerceIn(1f, height - 1f)
-        val t = SystemClock.uptimeMillis()
-        send(MotionEvent.ACTION_DOWN, t, t, sx, sy)
-        for (i in 1..8) send(MotionEvent.ACTION_MOVE, t, t + i * 12L, sx + dx * i / 8, sy + dy * i / 8)
-        send(MotionEvent.ACTION_UP, t, t + 110, sx + dx, sy + dy)
+    /**
+     * Scrolls a fixed step ([fx], [fy] are fractions of the visible page), without fling: whatever is
+     * scrollable under the pointer (a box with its own scroll bar), else the page itself. Fake finger
+     * swipes were read as hard flicks and flew to the end of the page.
+     * With [exitIfStuck], nothing left to scroll up means "go to the toolbar".
+     */
+    private fun scroll(fx: Float, fy: Float, held: Boolean, exitIfStuck: Boolean = false) {
+        val px = (if (cx >= 0) cx else width / 2f) / width.coerceAtLeast(1)
+        val py = (if (cy >= 0) cy else height / 2f) / height.coerceAtLeast(1)
+        val js = SCROLL_JS
+            .replace("%PX%", px.toString()).replace("%PY%", py.toString())
+            .replace("%FX%", fx.toString()).replace("%FY%", fy.toString())
+            .replace("%B%", if (held) "auto" else "smooth")
+        val target = customView
+        if (target != null) return // a full-screen video has nothing to scroll
+        webView.evaluateJavascript(js) { result ->
+            if (exitIfStuck && result?.contains("none") == true) onExitTop?.invoke()
+        }
     }
 
     private fun send(action: Int, down: Long, time: Long, x: Float, y: Float) {
@@ -248,6 +255,31 @@ class BrowserView(context: Context) : FrameLayout(context) {
 
     companion object {
         const val HOME = "https://www.google.com"
+
+        // Finds the nearest scroller under the pointer that can still move that way, else the page.
+        private val SCROLL_JS = """
+            (function(px, py, fx, fy, b) {
+              var dx = fx * window.innerWidth, dy = fy * window.innerHeight;
+              function can(e) {
+                if (dy < 0 && e.scrollTop > 0) return true;
+                if (dy > 0 && e.scrollTop + e.clientHeight < e.scrollHeight - 1) return true;
+                if (dx < 0 && e.scrollLeft > 0) return true;
+                if (dx > 0 && e.scrollLeft + e.clientWidth < e.scrollWidth - 1) return true;
+                return false;
+              }
+              var e = document.elementFromPoint(px * window.innerWidth, py * window.innerHeight);
+              while (e && e !== document.body && e !== document.documentElement) {
+                var s = getComputedStyle(e);
+                if (/(auto|scroll|overlay)/.test(s.overflowY + s.overflowX) && can(e)) {
+                  e.scrollBy({ left: dx, top: dy, behavior: b }); return 'box';
+                }
+                e = e.parentElement;
+              }
+              var r = document.scrollingElement || document.documentElement;
+              if (can(r)) { window.scrollBy({ left: dx, top: dy, behavior: b }); return 'page'; }
+              return 'none';
+            })(%PX%, %PY%, %FX%, %FY%, '%B%');
+        """.trimIndent()
         private const val DESKTOP_UA =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
