@@ -616,13 +616,37 @@
   function renderRecent() {
     $('openRecent').innerHTML = recent.map((r, i) => `<button type="button" class="chip-btn" data-recent="${i}">${esc(r.length > 34 ? r.slice(0, 33) + '…' : r)}</button>`).join('');
   }
+  // fetch() has no time limit of its own: without one a stalled request says "Sending…" forever.
+  async function fetchWithin(ms, url, opts) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), ms);
+    try {
+      return await fetch(url, Object.assign({}, opts, { signal: ctl.signal }));
+    } catch (e) {
+      throw ctl.signal.aborted ? new Error('the relay didn\'t answer') : e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  // Post a short message to the TV. If the normal POST stalls or fails, try the relay's GET form
+  // (ntfy.sh/<topic>/publish?message=…), which some networks and browsers handle better.
+  async function postToTv(topic, text) {
+    try {
+      const r = await fetchWithin(10000, `${RELAY}/${topic}`, { method: 'POST', body: text });
+      if (r.ok) return;
+      if (r.status === 429) throw new Error('the relay says too many messages; wait a minute');
+    } catch (e) {
+      if (/too many/.test(e.message)) throw e;
+    }
+    const r = await fetchWithin(10000, `${RELAY}/${topic}/publish?message=${encodeURIComponent(text)}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('relay returned ' + r.status);
+  }
   async function openOnTv(text) {
     text = text.trim();
     if (!text || !code) return;
     $('openStatus').textContent = 'Sending…';
     try {
-      const r = await fetch(`${RELAY}/${topicOpen(code)}`, { method: 'POST', body: text });
-      if (!r.ok) throw new Error('relay returned ' + r.status);
+      await postToTv(topicOpen(code), text);
       recent = [text].concat(recent.filter(x => x !== text)).slice(0, 6);
       store.set('recentOpen', recent); renderRecent();
       $('openStatus').textContent = /\.m3u8?(\?|#|\||$)/i.test(text)
@@ -651,7 +675,7 @@
     if (text.length > 15e6) { $('openStatus').textContent = 'That playlist is too big to send (over 15 MB).'; return; }
     $('openStatus').textContent = 'Sending…';
     try {
-      const r = await fetch(`${RELAY}/${topicOpen(code)}?filename=${encodeURIComponent(file.name || 'playlist.m3u')}`, { method: 'POST', body: text });
+      const r = await fetchWithin(60000, `${RELAY}/${topicOpen(code)}?filename=${encodeURIComponent(file.name || 'playlist.m3u')}`, { method: 'POST', body: text });
       if (!r.ok) throw new Error('relay returned ' + r.status);
       const n = (text.match(/#EXTINF/gi) || []).length;
       $('openStatus').textContent = `Sent ${n} channels. The TV adds them in a few seconds (the TV app needs to be open).`;
