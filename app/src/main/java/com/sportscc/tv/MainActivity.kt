@@ -38,6 +38,8 @@ import com.sportscc.tv.ui.SettingsScreen
 import com.sportscc.tv.ui.TeamOptionsScreen
 import com.sportscc.tv.ui.TeamPickerScreen
 import com.sportscc.tv.ui.TrackModeScreen
+import com.sportscc.tv.ui.WatchScreen
+import com.sportscc.tv.browser.BrowserView
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -53,6 +55,7 @@ private sealed interface Screen {
     data class Manage(val key: String) : Screen
     data object Settings : Screen
     data object Phone : Screen
+    data class Watch(val url: String? = null) : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -116,8 +119,17 @@ class MainActivity : ComponentActivity() {
         val watchlist by store.watchlist.collectAsStateWithLifecycle()
         val settings by store.settings.collectAsStateWithLifecycle()
 
+        val stack = remember { mutableStateListOf<Screen>(Screen.Home) }
+        fun push(s: Screen) = stack.add(s)
+        fun pop() {
+            if (stack.size > 1) stack.removeAt(stack.lastIndex)
+        }
+        fun home() {
+            while (stack.size > 1) stack.removeAt(stack.lastIndex)
+        }
         // Screen updates don't count as activity, so without this the screen saver starts mid-game.
-        val keepOn = when (settings.keepAwake) {
+        // The Watch screen is usually showing video, so it always stays awake.
+        val keepOn = stack.last() is Screen.Watch || when (settings.keepAwake) {
             KeepAwake.ALWAYS -> true
             KeepAwake.LIVE -> dashboard?.anyLive == true
             KeepAwake.NEVER -> false
@@ -127,15 +139,18 @@ class MainActivity : ComponentActivity() {
             else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
 
-        val stack = remember { mutableStateListOf<Screen>(Screen.Home) }
-        fun push(s: Screen) = stack.add(s)
-        fun pop() {
-            if (stack.size > 1) stack.removeAt(stack.lastIndex)
-        }
-        fun home() {
-            while (stack.size > 1) stack.removeAt(stack.lastIndex)
-        }
         BackHandler(enabled = stack.size > 1) { pop() }
+
+        // "Open on TV" from the phone: jump to the Watch screen, or load it there if already open.
+        val incoming by scc.sync.incomingUrl.collectAsStateWithLifecycle()
+        LaunchedEffect(incoming) {
+            val u = incoming ?: return@LaunchedEffect
+            if (stack.last() !is Screen.Watch) {
+                home()
+                push(Screen.Watch(u))
+                scc.sync.consumeIncomingUrl()
+            }
+        }
 
         // Home-screen state that outlives a trip to another screen.
         var focusKey by remember { mutableStateOf<String?>(null) }
@@ -170,6 +185,7 @@ class MainActivity : ComponentActivity() {
                 movingKey = movingKey,
                 onAdd = { push(Screen.Leagues) },
                 onPhone = { push(Screen.Phone) },
+                onWatch = { push(Screen.Watch()) },
                 onRefresh = { engine.refreshNow() },
                 onSettings = { push(Screen.Settings) },
                 onCardClick = {
@@ -274,6 +290,31 @@ class MainActivity : ComponentActivity() {
                     onMoveTop = { store.moveToTop(item.key); home() },
                     onRemove = { store.remove(item.key); home() },
                     onBack = { pop() },
+                )
+            }
+
+            is Screen.Watch -> {
+                val saved by scc.browser.saved.collectAsStateWithLifecycle()
+                DisposableEffect(Unit) {
+                    scc.sync.fast.value = true // links from the phone arrive within a few seconds
+                    onDispose { scc.sync.fast.value = false }
+                }
+                WatchScreen(
+                    cards = cards,
+                    feed = feed,
+                    banner = banner,
+                    layout = settings.browserLayout,
+                    desktop = settings.browserDesktop,
+                    saved = saved,
+                    startUrl = screen.url ?: scc.browser.lastUrl ?: BrowserView.HOME,
+                    incomingUrl = incoming,
+                    onIncomingHandled = { scc.sync.consumeIncomingUrl() },
+                    onLayout = { l -> store.updateSettings { it.copy(browserLayout = l) } },
+                    onDesktop = { d -> store.updateSettings { it.copy(browserDesktop = d) } },
+                    onPage = { scc.browser.lastUrl = it },
+                    onSave = { scc.browser.save(it); Toast.makeText(this@MainActivity, "Saved", Toast.LENGTH_SHORT).show() },
+                    onRemoveSaved = { scc.browser.remove(it) },
+                    onExit = { pop() },
                 )
             }
 

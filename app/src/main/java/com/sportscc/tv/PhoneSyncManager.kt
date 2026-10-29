@@ -46,6 +46,17 @@ class PhoneSyncManager(context: Context, private val store: WatchlistStore, priv
     /** Poll every few seconds while the pairing screen is open, so the first sync feels instant. */
     val fast = MutableStateFlow(false)
 
+    /** A link sent from the phone's "Open on TV" box, waiting for the browser to open it. */
+    private val _incomingUrl = MutableStateFlow<String?>(null)
+    val incomingUrl: StateFlow<String?> = _incomingUrl.asStateFlow()
+    fun consumeIncomingUrl() {
+        _incomingUrl.value = null
+    }
+
+    // Links sent before the app started are stale: only open ones sent from now on.
+    private var lastOpenId: String? = null
+    private val startedAtSec = System.currentTimeMillis() / 1000
+
     private var job: Job? = null
 
     @Synchronized
@@ -100,6 +111,11 @@ class PhoneSyncManager(context: Context, private val store: WatchlistStore, priv
                 if (msg != null && msg.id != lastId) {
                     prefs.edit().putString(KEY_LAST_ID, msg.id).apply()
                     apply(SyncCodec.decode(msg.message))
+                }
+                val open = relay.latest(PairingCode.openTopic(_code.value), lastOpenId, lastOpenId ?: startedAtSec.toString())
+                if (open != null && open.id != lastOpenId) {
+                    lastOpenId = open.id
+                    open.message.trim().takeIf { it.isNotEmpty() }?.let { _incomingUrl.value = it }
                 }
                 if (_status.value.error != null) _status.value = _status.value.copy(error = null)
             } catch (e: Exception) {

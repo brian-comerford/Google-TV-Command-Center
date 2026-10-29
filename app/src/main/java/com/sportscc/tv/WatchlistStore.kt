@@ -29,9 +29,19 @@ data class AppSettings(
     val cardColumns: Int = 2,
     /** When to stop Google TV's screen saver while the app is on screen. */
     val keepAwake: KeepAwake = KeepAwake.LIVE,
+    /** Watch screen: where the stats sit around the browser. */
+    val browserLayout: BrowserLayout = BrowserLayout.FRAMED,
+    /** Ask sites for their desktop version (often better for video players). */
+    val browserDesktop: Boolean = false,
 )
 
 enum class KeepAwake { LIVE, ALWAYS, NEVER }
+
+enum class BrowserLayout(val label: String) {
+    FRAMED("Right + bottom"), RIGHT("Right only"), BOTTOM("Bottom only"), FULL("Browser only");
+
+    fun next(): BrowserLayout = entries[(ordinal + 1) % entries.size]
+}
 
 /** Watchlist + settings, persisted as JSON in SharedPreferences. */
 class WatchlistStore(context: Context) {

@@ -71,6 +71,23 @@ should pop up over it about 6 seconds later.
   you put them; **Live games first** lifts live games to the top), every update or big plays only,
   and background alerts on or off.
 
+## Watch: a web page with your stats around it
+Press **Watch** on the home screen. A built-in browser fills the top-left of the screen, with your cards
+down the right side and live scores plus the Live Feed scrolling along the bottom.
+- **Open a page:** on the phone website, type a site or search words in **Open on TV**; it opens on the
+  TV within a few seconds. Or press **Search / URL** on the TV, or pick one of your **Saved** sites.
+- **Remote:** the arrows move an on-screen pointer and OK clicks. Push past an edge to scroll, or switch
+  to **Scroll** mode. Up at the top of the page reaches the toolbar. Back goes back a page, then exits.
+- **Full-screen video** fills the browser area, not the whole TV, so the stats stay visible.
+- **Layout:** Right + bottom, Right only, Bottom only, or Browser only. **Desktop site** asks pages
+  for their desktop version, which often has a better video player.
+- Pop-up windows, new tabs, downloads and links that try to launch other apps are blocked.
+- Paid services (YouTube TV, Hulu, Peacock, ESPN+, Netflix) generally refuse to play in an app's
+  built-in browser. Plain web video players usually work.
+
+The version before this feature is saved as **Non-Browser** (see `CLAUDE.md`), with its own APK:
+`https://github.com/brian-comerford/Google-TV-Command-Center/releases/download/non-browser/SportsCommandCenter.apk`
+
 ## Phone remote (edit your list on your phone)
 Typing is easier on a phone, so you can build your list on the website in `web/`, which is hosted on
 GitHub Pages: `https://brian-comerford.github.io/Google-TV-Command-Center/`.

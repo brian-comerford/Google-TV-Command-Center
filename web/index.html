@@ -60,6 +60,19 @@
       </div>
     </section>
 
+    <!-- Open a page in the TV's Watch screen -->
+    <section class="card" id="openCard" hidden>
+      <h2>Open on TV</h2>
+      <p class="muted small">Opens in the TV's <b>Watch</b> screen, with your stats around it. Type a site or search words.</p>
+      <form id="openForm" class="row" autocomplete="off">
+        <label for="openInput" class="sr">Site or search</label>
+        <input id="openInput" placeholder="e.g. a stream site, or &quot;Bills Dolphins live&quot;" enterkeyhint="go">
+        <button class="btn primary" type="submit">Open</button>
+      </form>
+      <p class="muted small" id="openStatus"></p>
+      <div class="chips" id="openRecent"></div>
+    </section>
+
     <!-- The list -->
     <section>
       <div class="row between section-head">

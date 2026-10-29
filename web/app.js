@@ -84,6 +84,7 @@
   const normalize = c => c.toUpperCase().split('').filter(ch => CODE_ALPHABET.includes(ch)).join('');
   const topicIn = c => `scc-tv-${normalize(c).toLowerCase()}-in`;
   const topicTv = c => `scc-tv-${normalize(c).toLowerCase()}-tv`;
+  const topicOpen = c => `scc-tv-${normalize(c).toLowerCase()}-open`;
   const pretty = c => { const n = normalize(c); return n.slice(0, 4) + '-' + n.slice(4); };
 
   // ---------- teams & rosters ----------
@@ -186,6 +187,7 @@
   function renderLink() {
     $('linkForm').hidden = !!code;
     $('linked').hidden = !code;
+    $('openCard').hidden = !code;
     if (code) $('codeDisplay').textContent = pretty(code);
     renderStatus();
   }
@@ -608,6 +610,30 @@
       : Object.assign({ type: 'total', line: n, side: $('legUnder').checked ? 'UNDER' : 'OVER' }, legBase));
     ldlg.close();
   });
+
+  // ---------- open on TV ----------
+  let recent = store.get('recentOpen', []);
+  function renderRecent() {
+    $('openRecent').innerHTML = recent.map((r, i) => `<button type="button" class="chip-btn" data-recent="${i}">${esc(r.length > 34 ? r.slice(0, 33) + '…' : r)}</button>`).join('');
+  }
+  async function openOnTv(text) {
+    text = text.trim();
+    if (!text || !code) return;
+    $('openStatus').textContent = 'Sending…';
+    try {
+      const r = await fetch(`${RELAY}/${topicOpen(code)}`, { method: 'POST', body: text });
+      if (!r.ok) throw new Error('relay returned ' + r.status);
+      recent = [text].concat(recent.filter(x => x !== text)).slice(0, 6);
+      store.set('recentOpen', recent); renderRecent();
+      $('openStatus').textContent = 'Sent. It opens on the TV in a few seconds (the TV app needs to be open).';
+      $('openInput').value = '';
+    } catch (e) {
+      $('openStatus').textContent = 'Not sent: ' + e.message;
+    }
+  }
+  $('openForm').addEventListener('submit', e => { e.preventDefault(); openOnTv($('openInput').value); });
+  $('openRecent').addEventListener('click', e => { const b = e.target.closest('[data-recent]'); if (b) openOnTv(recent[+b.dataset.recent]); });
+  renderRecent();
 
   // ---------- install / update card ----------
   $('copyApk').addEventListener('click', async () => {

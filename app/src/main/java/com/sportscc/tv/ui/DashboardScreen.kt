@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -99,6 +100,7 @@ fun DashboardScreen(
     /** Card being moved with the arrows, or null. */
     movingKey: String?,
     onAdd: () -> Unit,
+    onWatch: () -> Unit,
     onPhone: () -> Unit,
     onRefresh: () -> Unit,
     onSettings: () -> Unit,
@@ -129,6 +131,7 @@ fun DashboardScreen(
                     Text("SPORTS COMMAND CENTER", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Palette.Text, letterSpacing = 1.5.sp)
                     if (movingName != null) MoveHint(movingName, liveFirst) else StatusLine(dashboard)
                 }
+                FocusButton("Watch", onWatch, Modifier.padding(start = 8.dp), accent = Palette.Live)
                 FocusButton("+ Add", onAdd, Modifier.focusRequester(addFocus).padding(start = 8.dp))
                 FocusButton("Phone", onPhone, Modifier.padding(start = 8.dp))
                 FocusButton("Refresh", onRefresh, Modifier.padding(start = 8.dp))
@@ -467,7 +470,7 @@ private fun ParlayCardView(card: ParlayCard, modifier: Modifier, moving: Boolean
 }
 
 @Composable
-private fun LegRow(l: LegState) {
+internal fun LegRow(l: LegState) {
     val (mark, color) = when (l.status) {
         LegStatus.WON -> "✓" to Palette.Win
         LegStatus.LOST -> "✗" to Palette.Live
@@ -507,7 +510,7 @@ private fun StatChipView(value: String, label: String, accent: Color? = null) {
 }
 
 @Composable
-private fun PropRow(p: PropProgress, state: GameState?) {
+internal fun PropRow(p: PropProgress, state: GameState?) {
     val over = p.prop.side == Prop.Side.OVER
     val color = when {
         p.winning -> Palette.Win
@@ -536,7 +539,7 @@ private fun PropRow(p: PropProgress, state: GameState?) {
 }
 
 @Composable
-private fun StatusPill(g: Game) {
+internal fun StatusPill(g: Game) {
     when (g.state) {
         GameState.IN -> Pill(g.shortDetail.ifBlank { "LIVE" }, Palette.Live)
         GameState.POST -> Pill(g.shortDetail.ifBlank { "Final" }, Palette.Muted, filled = false)
@@ -587,7 +590,7 @@ private fun FeedRow(a: Alert) {
 }
 
 @Composable
-fun AlertBanner(alert: Alert?, modifier: Modifier = Modifier) {
+fun AlertBanner(alert: Alert?, modifier: Modifier = Modifier, width: Dp = 620.dp) {
     // Keep the last alert around so the exit animation still has content to draw.
     var last by remember { mutableStateOf<Alert?>(null) }
     if (alert != null) last = alert
@@ -601,7 +604,7 @@ fun AlertBanner(alert: Alert?, modifier: Modifier = Modifier) {
         val accent = if (a.big) Palette.Live else Palette.Accent
         Row(
             Modifier
-                .width(620.dp)
+                .width(width)
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xF0101621))
                 .border(BorderStroke(3.dp, accent), RoundedCornerShape(16.dp))

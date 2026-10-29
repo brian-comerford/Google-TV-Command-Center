@@ -62,6 +62,9 @@ object PairingCode {
 
     /** TV -> phone channel (so the website can load what's already on the TV). */
     fun stateTopic(code: String) = "scc-tv-${normalize(code).lowercase()}-tv"
+
+    /** Phone -> TV links to open in the TV's built-in browser (plain text: a URL or search words). */
+    fun openTopic(code: String) = "scc-tv-${normalize(code).lowercase()}-open"
 }
 
 data class RelayMessage(val id: String, val time: Long, val message: String)
@@ -85,9 +88,11 @@ class Relay(private val base: String = "https://ntfy.sh", private val timeoutMs:
         }
     }
 
-    /** Newest message on [topic] after [sinceId] (or from the last 12 hours), or null. */
-    suspend fun latest(topic: String, sinceId: String?): RelayMessage? = withContext(Dispatchers.IO) {
-        val since = sinceId ?: "12h"
+    /**
+     * Newest message on [topic] after [sinceId] (or from the last 12 hours), or null.
+     * [since] overrides that: a message id, a duration like "12h", or a Unix time in seconds.
+     */
+    suspend fun latest(topic: String, sinceId: String?, since: String = sinceId ?: "12h"): RelayMessage? = withContext(Dispatchers.IO) {
         val conn = URL("$base/$topic/json?poll=1&since=$since").openConnection() as HttpURLConnection
         try {
             conn.connectTimeout = timeoutMs
