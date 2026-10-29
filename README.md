@@ -71,16 +71,28 @@ should pop up over it about 6 seconds later.
   you put them; **Live games first** lifts live games to the top), every update or big plays only,
   and background alerts on or off.
 
-## Watch: a web page with your stats around it
-Press **Watch** on the home screen. A built-in browser fills the top-left of the screen, with your cards
+## Watch: a web page or stream with your stats around it
+Press **Watch** on the home screen. A built-in browser (or video player) fills the top-left of the screen, with your cards
 down the right side and live scores plus the Live Feed scrolling along the bottom.
 - **Open a page:** on the phone website, type a site or search words in **Open on TV**; it opens on the
-  TV within a few seconds. Or press **Search / URL** on the TV, or pick one of your **Saved** sites.
+  TV within a few seconds (the TV app needs to be open). Or press **Search / URL** on the TV, or pick one of your **Saved** sites.
 - **Remote:** the arrows move an on-screen pointer and OK clicks. Push past an edge to scroll, or switch
   to **Scroll** mode. Up at the top of the page reaches the toolbar. Back goes back a page, then exits.
 - **Full-screen video** fills the browser area, not the whole TV, so the stats stay visible.
 - **Layout:** Right + bottom, Right only, Bottom only, or Browser only. **Desktop site** asks pages
   for their desktop version, which often has a better video player.
+- **Stream links (.m3u8):** paste one into **Open on TV** (or **Search** on the TV) and it plays in a
+  built-in video player in the same spot, with your stats around it. It also plays DASH (.mpd), MP4 and
+  MPEG-TS links. Remote: OK pauses or plays, ◀ ▶ skip 10 seconds, ▼ opens the channel list, ▲ reaches the
+  toolbar, and Back returns to the browser. If a stream needs a particular User-Agent or Referer, add it
+  after a pipe: `https://…/live.m3u8|User-Agent=VLC&Referer=https://example.com/`.
+- **Playlists (.m3u):** paste a playlist link into **Open on TV**, or tap **Send a playlist file** on the
+  phone site. The TV keeps its channels: press **Channels** to pick one, filter by group, or type part of
+  a name. ☆ adds a channel to **Favorites**. **◀ Ch / Ch ▶** (or the remote's channel buttons) step through
+  the list you picked from. **Refresh** downloads a linked playlist again. Channel names, logos, groups and
+  `#EXTVLCOPT` User-Agent / Referer lines are read from the playlist.
+- **Save** while a stream plays adds it to **Saved**. Streams that need a sign-in, or are copy-protected
+  (DRM), won't play. Only use streams and playlists you're entitled to watch.
 - Pop-up windows, new tabs, downloads and links that try to launch other apps are blocked.
 - Paid services (YouTube TV, Hulu, Peacock, ESPN+, Netflix) generally refuse to play in an app's
   built-in browser. Plain web video players usually work.

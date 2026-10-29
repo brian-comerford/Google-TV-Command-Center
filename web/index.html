@@ -63,12 +63,15 @@
     <!-- Open a page in the TV's Watch screen -->
     <section class="card" id="openCard" hidden>
       <h2>Open on TV</h2>
-      <p class="muted small">Opens in the TV's <b>Watch</b> screen, with your stats around it. Type a site or search words.</p>
+      <p class="muted small">Opens in the TV's <b>Watch</b> screen, with your stats around it. Type a site or search words,
+        paste a stream link (<b>.m3u8</b>) to play it, or a playlist link (<b>.m3u</b>) to add its channels.</p>
       <form id="openForm" class="row" autocomplete="off">
-        <label for="openInput" class="sr">Site or search</label>
-        <input id="openInput" placeholder="e.g. a stream site, or &quot;Bills Dolphins live&quot;" enterkeyhint="go">
+        <label for="openInput" class="sr">Site, search, stream or playlist</label>
+        <input id="openInput" placeholder="a site, &quot;Bills Dolphins live&quot;, or an .m3u8 / .m3u link" enterkeyhint="go">
         <button class="btn primary" type="submit">Open</button>
       </form>
+      <button class="btn ghost" id="playlistFileBtn" type="button">Send a playlist file (.m3u)</button>
+      <input type="file" id="playlistFile" accept=".m3u,.m3u8,audio/x-mpegurl,application/vnd.apple.mpegurl,text/plain" hidden>
       <p class="muted small" id="openStatus"></p>
       <div class="chips" id="openRecent"></div>
     </section>

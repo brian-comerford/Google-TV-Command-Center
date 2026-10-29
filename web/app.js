@@ -625,13 +625,40 @@
       if (!r.ok) throw new Error('relay returned ' + r.status);
       recent = [text].concat(recent.filter(x => x !== text)).slice(0, 6);
       store.set('recentOpen', recent); renderRecent();
-      $('openStatus').textContent = 'Sent. It opens on the TV in a few seconds (the TV app needs to be open).';
+      $('openStatus').textContent = /\.m3u8?(\?|#|\||$)/i.test(text)
+        ? 'Sent. The TV plays the stream, or adds the playlist\'s channels, in a few seconds (the TV app needs to be open).'
+        : 'Sent. It opens on the TV in a few seconds (the TV app needs to be open).';
       $('openInput').value = '';
     } catch (e) {
       $('openStatus').textContent = 'Not sent: ' + e.message;
     }
   }
   $('openForm').addEventListener('submit', e => { e.preventDefault(); openOnTv($('openInput').value); });
+
+  // A playlist file goes to the relay as an attachment (it's usually too big for a message).
+  $('playlistFileBtn').addEventListener('click', () => $('playlistFile').click());
+  $('playlistFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file || !code) return;
+    let text = await file.text();
+    if (!/#EXTINF/i.test(text)) { $('openStatus').textContent = 'That file has no channels in it (no #EXTINF lines).'; return; }
+    // The TV names the playlist from this line.
+    if (!/^#PLAYLIST:/im.test(text)) {
+      const name = file.name.replace(/\.m3u8?$/i, '') || 'Playlist';
+      text = text.replace(/^(\uFEFF?#EXTM3U[^\n]*\n)?/, m => (m || '#EXTM3U\n') + '#PLAYLIST:' + name + '\n');
+    }
+    if (text.length > 15e6) { $('openStatus').textContent = 'That playlist is too big to send (over 15 MB).'; return; }
+    $('openStatus').textContent = 'Sending…';
+    try {
+      const r = await fetch(`${RELAY}/${topicOpen(code)}?filename=${encodeURIComponent(file.name || 'playlist.m3u')}`, { method: 'POST', body: text });
+      if (!r.ok) throw new Error('relay returned ' + r.status);
+      const n = (text.match(/#EXTINF/gi) || []).length;
+      $('openStatus').textContent = `Sent ${n} channels. The TV adds them in a few seconds (the TV app needs to be open).`;
+    } catch (err) {
+      $('openStatus').textContent = 'Not sent: ' + err.message;
+    }
+  });
   $('openRecent').addEventListener('click', e => { const b = e.target.closest('[data-recent]'); if (b) openOnTv(recent[+b.dataset.recent]); });
   renderRecent();
 

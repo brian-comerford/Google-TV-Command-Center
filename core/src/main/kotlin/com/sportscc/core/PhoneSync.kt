@@ -67,7 +67,8 @@ object PairingCode {
     fun openTopic(code: String) = "scc-tv-${normalize(code).lowercase()}-open"
 }
 
-data class RelayMessage(val id: String, val time: Long, val message: String)
+/** [attachmentUrl] is set when the sender posted a file (e.g. a playlist) instead of a short message. */
+data class RelayMessage(val id: String, val time: Long, val message: String, val attachmentUrl: String? = null)
 
 /** Minimal client for ntfy.sh, a free public pub/sub relay (messages are kept for 12 hours). */
 class Relay(private val base: String = "https://ntfy.sh", private val timeoutMs: Int = 10_000) {
@@ -105,6 +106,10 @@ class Relay(private val base: String = "https://ntfy.sh", private val timeoutMs:
         }
     }
 
+    /** Downloads a text file, e.g. a message's attachment or a playlist; refuses anything over [maxBytes]. */
+    suspend fun fetchText(url: String, headers: Map<String, String> = emptyMap(), maxBytes: Int = 20_000_000): String =
+        withContext(Dispatchers.IO) { HttpText.get(url, headers, maxBytes, timeoutMs * 3) }
+
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
 
@@ -114,12 +119,57 @@ class Relay(private val base: String = "https://ntfy.sh", private val timeoutMs:
             .mapNotNull { runCatching { json.parseToJsonElement(it) as? JsonObject }.getOrNull() }
             .filter { it.str("event") == "message" }
             .mapNotNull { o ->
+                val attachment = (o["attachment"] as? JsonObject)?.str("url")
                 RelayMessage(
                     id = o.str("id") ?: return@mapNotNull null,
                     time = o["time"]?.jsonPrimitive?.longOrNull ?: 0L,
-                    message = o.str("message") ?: return@mapNotNull null,
+                    message = o.str("message") ?: if (attachment != null) "" else return@mapNotNull null,
+                    attachmentUrl = attachment,
                 )
             }
             .lastOrNull()
+    }
+}
+
+/** Plain HTTP GET of a text file, following redirects (including http <-> https, which Java won't do itself). */
+object HttpText {
+    fun get(url: String, headers: Map<String, String> = emptyMap(), maxBytes: Int = 20_000_000, timeoutMs: Int = 30_000): String {
+        var current = url
+        repeat(6) {
+            val conn = URL(current).openConnection() as HttpURLConnection
+            try {
+                conn.instanceFollowRedirects = false
+                conn.connectTimeout = timeoutMs
+                conn.readTimeout = timeoutMs
+                conn.setRequestProperty("User-Agent", headers["User-Agent"] ?: "Mozilla/5.0 (Linux; Android TV) SportsCommandCenter")
+                headers.forEach { (k, v) -> if (k != "User-Agent") conn.setRequestProperty(k, v) }
+                val code = conn.responseCode
+                if (code in 300..399) {
+                    val loc = conn.getHeaderField("Location") ?: throw IOException("HTTP $code without a location")
+                    current = URL(URL(current), loc).toString()
+                    return@repeat
+                }
+                if (code !in 200..299) throw IOException("HTTP $code")
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(64 * 1024)
+                conn.inputStream.use { input ->
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        out.write(buf, 0, n)
+                        if (out.size() > maxBytes) throw IOException("File is too big")
+                    }
+                }
+                val bytes = out.toByteArray()
+                // Some servers gzip without saying so.
+                val text = if (bytes.size > 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()) {
+                    GZIPInputStream(bytes.inputStream()).use { it.readBytes() }
+                } else bytes
+                return text.toString(Charsets.UTF_8)
+            } finally {
+                conn.disconnect()
+            }
+        }
+        throw IOException("Too many redirects")
     }
 }

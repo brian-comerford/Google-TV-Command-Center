@@ -46,7 +46,10 @@ class PhoneSyncManager(context: Context, private val store: WatchlistStore, priv
     /** Poll every few seconds while the pairing screen is open, so the first sync feels instant. */
     val fast = MutableStateFlow(false)
 
-    /** A link sent from the phone's "Open on TV" box, waiting for the browser to open it. */
+    /**
+     * Something sent from the phone's "Open on TV" box, waiting for the Watch screen: a web address or
+     * search words, a stream link, a playlist link, or a playlist file's text.
+     */
     private val _incomingUrl = MutableStateFlow<String?>(null)
     val incomingUrl: StateFlow<String?> = _incomingUrl.asStateFlow()
     fun consumeIncomingUrl() {
@@ -115,7 +118,9 @@ class PhoneSyncManager(context: Context, private val store: WatchlistStore, priv
                 val open = relay.latest(PairingCode.openTopic(_code.value), lastOpenId, lastOpenId ?: startedAtSec.toString())
                 if (open != null && open.id != lastOpenId) {
                     lastOpenId = open.id
-                    open.message.trim().takeIf { it.isNotEmpty() }?.let { _incomingUrl.value = it }
+                    // A playlist file sent from the phone arrives as an attachment: pass on its text.
+                    val text = open.attachmentUrl?.let { runCatching { relay.fetchText(it) }.getOrNull() } ?: open.message
+                    text.trim().takeIf { it.isNotEmpty() }?.let { _incomingUrl.value = it }
                 }
                 if (_status.value.error != null) _status.value = _status.value.copy(error = null)
             } catch (e: Exception) {

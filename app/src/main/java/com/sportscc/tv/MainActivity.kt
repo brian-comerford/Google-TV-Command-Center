@@ -141,7 +141,8 @@ class MainActivity : ComponentActivity() {
 
         BackHandler(enabled = stack.size > 1) { pop() }
 
-        // "Open on TV" from the phone: jump to the Watch screen, or load it there if already open.
+        // "Open on TV" from the phone (a page, a stream or a playlist): jump to the Watch screen,
+        // or open it there if it's already showing.
         val incoming by scc.sync.incomingUrl.collectAsStateWithLifecycle()
         LaunchedEffect(incoming) {
             val u = incoming ?: return@LaunchedEffect
@@ -306,7 +307,9 @@ class MainActivity : ComponentActivity() {
                     layout = settings.browserLayout,
                     desktop = settings.browserDesktop,
                     saved = saved,
-                    startUrl = screen.url ?: scc.browser.lastUrl ?: BrowserView.HOME,
+                    streams = scc.streams,
+                    homeUrl = scc.browser.lastUrl ?: BrowserView.HOME,
+                    startInput = screen.url,
                     incomingUrl = incoming,
                     onIncomingHandled = { scc.sync.consumeIncomingUrl() },
                     onLayout = { l -> store.updateSettings { it.copy(browserLayout = l) } },

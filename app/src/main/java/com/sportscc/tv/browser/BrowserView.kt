@@ -159,6 +159,12 @@ class BrowserView(context: Context) : FrameLayout(context) {
 
     fun reload() = webView.reload()
 
+    /** Pauses any video or sound on the page (when the stream player takes over). */
+    fun pauseMedia() {
+        exitFullscreen()
+        webView.evaluateJavascript("document.querySelectorAll('video,audio').forEach(function(m){try{m.pause()}catch(e){}})", null)
+    }
+
     fun destroy() {
         exitFullscreen()
         webView.stopLoading()

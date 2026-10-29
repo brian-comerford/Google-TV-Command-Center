@@ -14,11 +14,14 @@ class SccApp : Application() {
         private set
     lateinit var browser: com.sportscc.tv.browser.BrowserStore
         private set
+    lateinit var streams: com.sportscc.tv.stream.StreamStore
+        private set
 
     override fun onCreate() {
         super.onCreate()
         store = WatchlistStore(this)
         browser = com.sportscc.tv.browser.BrowserStore(this)
+        streams = com.sportscc.tv.stream.StreamStore(this)
         engine = TrackerEngine(store)
         sync = PhoneSyncManager(this, store) { engine.notify(it) }
         MainScope().launch {
