@@ -134,14 +134,9 @@
       </div>
       <label for="parlayName" class="sr">Name</label>
       <input id="parlayName" placeholder="Name (optional), e.g. Sunday 4-leg" autocomplete="off">
-      <div class="row">
-        <div class="grow"><label for="parlayOdds" class="small muted">Parlay odds</label><input id="parlayOdds" inputmode="text" placeholder="+1050" autocomplete="off"></div>
-        <div class="grow"><label for="parlayStake" class="small muted">Stake ($)</label><input id="parlayStake" type="number" inputmode="decimal" min="0" step="1" placeholder="10" autocomplete="off"></div>
-      </div>
       <div id="legList" class="picker"></div>
       <div class="row between">
         <button class="btn" id="addLegBtn" type="button">+ Add leg</button>
-        <span class="muted small" id="parlayWin"></span>
         <button class="btn primary" id="parlaySave" type="button">Save parlay</button>
       </div>
       <p class="error" id="parlayError" hidden></p>

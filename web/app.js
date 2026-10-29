@@ -47,8 +47,6 @@
     if (l.type === 'spread') return `${l.teamAbbreviation} ${l.points > 0 ? '+' : ''}${num(l.points)}`;
     return `${l.teamAbbreviation} game ${side(l.side)} ${num(l.line)}`;
   }
-  const toWin = (odds, stake) => (odds && stake) ? stake * (odds > 0 ? odds / 100 : 100 / Math.abs(odds)) : null;
-  const money = n => '$' + (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
   const num = n => (Math.round(n * 10) / 10).toString();
   const $ = id => document.getElementById(id);
 
@@ -126,8 +124,7 @@
           ${moveBtns(i)}<button class="x" data-remove="${i}" aria-label="Remove bet">×</button></div></div>`;
       }
       if (it.type === 'parlay') {
-        const win = toWin(it.odds, it.stake);
-        const meta = [it.legs.length + ' legs', it.odds ? (it.odds > 0 ? '+' : '') + it.odds : null, it.stake ? money(it.stake) + (win ? ' to win ' + money(win) : '') : null].filter(Boolean).join(' · ');
+        const meta = it.legs.length + ' legs';
         const marks = { WON: '✓', LOST: '✗', PUSH: '–' };
         return `<div class="item"><div class="item-head">
           <div class="who"><div class="name">${esc(it.name || it.legs.length + '-leg parlay')}</div><div class="sub"><span class="badge">PARLAY</span> ${esc(meta)}</div></div>
@@ -550,24 +547,15 @@
       : { type: 'parlay', id: Math.random().toString(36).slice(2, 10), name: '', legs: legs || [], createdAt: Date.now() };
     $('parlayTitle').textContent = src ? 'Edit parlay' : 'Build a parlay';
     $('parlayName').value = draft.name || '';
-    $('parlayOdds').value = draft.odds ? (draft.odds > 0 ? '+' : '') + draft.odds : '';
-    $('parlayStake').value = draft.stake || '';
     $('parlayError').hidden = true;
     renderDraft();
     pldlg.showModal();
-  }
-  function parseOdds() {
-    const v = parseInt(String($('parlayOdds').value).replace(/[^0-9-]/g, ''), 10);
-    return Number.isFinite(v) && Math.abs(v) >= 100 ? v : null;
   }
   function renderDraft() {
     $('legList').innerHTML = draft.legs.length ? draft.legs.map((l, i) =>
       `<div class="leg"><span class="what">${esc(legLabel(l))}<span class="sub">${esc(leagueById(l.league).label)}${l.result ? ' · ' + l.result.toLowerCase() : ''}</span></span>
         <button class="x" data-unleg="${i}" aria-label="Remove leg">×</button></div>`).join('')
       : '<p class="muted">No legs yet. Tap + Add leg for a player prop, moneyline, spread or game total.</p>';
-    const stake = parseFloat($('parlayStake').value);
-    const win = toWin(parseOdds(), stake > 0 ? stake : null);
-    $('parlayWin').textContent = win ? 'To win ' + money(win) : '';
   }
   // Legs come from the same screens whether they're for a parlay or a single bet.
   let legTarget = 'parlay';
@@ -584,7 +572,6 @@
     const b = e.target.closest('[data-unleg]'); if (!b) return;
     draft.legs.splice(+b.dataset.unleg, 1); renderDraft();
   });
-  ['parlayOdds', 'parlayStake'].forEach(id => $(id).addEventListener('input', renderDraft));
   $('parlayBtn').addEventListener('click', () => openParlay(null));
   $('parlayClose').addEventListener('click', () => pldlg.close());
   $('addLegBtn').addEventListener('click', () => { legTarget = 'parlay'; legMode = true; addStack = []; push(leagueStep()); dlg.showModal(); });
@@ -592,9 +579,8 @@
   $('parlaySave').addEventListener('click', () => {
     if (draft.legs.length < 2) { $('parlayError').textContent = 'A parlay needs at least 2 legs.'; $('parlayError').hidden = false; return; }
     draft.name = $('parlayName').value.trim();
-    const odds = parseOdds(), stake = parseFloat($('parlayStake').value);
-    if (odds) draft.odds = odds; else delete draft.odds;
-    if (stake > 0) draft.stake = stake; else delete draft.stake;
+    // Only whether it hits: no odds or stake (older saves may still carry them).
+    delete draft.odds; delete draft.stake;
     if (draftIndex >= 0) items[draftIndex] = draft; else items.push(draft);
     legMode = false; pldlg.close(); changed();
   });

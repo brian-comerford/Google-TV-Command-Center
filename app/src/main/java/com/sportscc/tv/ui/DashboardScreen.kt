@@ -393,7 +393,7 @@ private fun PlayerCardView(card: PlayerCard, modifier: Modifier, moving: Boolean
     }
 }
 
-/** A single bet: what it is, the score, and whether it's hitting. No odds or money, by design. */
+/** A single bet: what it is, the score, and whether it's hitting. No odds or money, by design (same for parlays). */
 @Composable
 private fun BetCardView(card: BetCard, modifier: Modifier, moving: Boolean, onClick: () -> Unit) {
     val st = card.state
@@ -452,11 +452,6 @@ private fun ParlayCardView(card: ParlayCard, modifier: Modifier, moving: Boolean
         }
         Spacer(Modifier.height(8.dp))
         Text(w.displayName, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        val money = listOfNotNull(
-            w.odds?.let { if (it > 0) "+$it" else "$it" },
-            w.stake?.let { s -> "$" + StatFormat.number(s) + (w.toWin?.let { " to win $" + String.format("%.2f", it).removeSuffix(".00") } ?: "") },
-        ).joinToString(" · ")
-        if (money.isNotEmpty()) Text(money, fontSize = 12.sp, color = Palette.Muted)
         Spacer(Modifier.height(4.dp))
         Text(
             st.summary, fontSize = 14.sp, fontWeight = FontWeight.Bold,

@@ -101,10 +101,9 @@ object AlertEngine {
         val before = ParlayEngine.evaluate(w, prev)
         val after = ParlayEngine.evaluate(w, next)
         val name = w.displayName
-        val win = w.toWin?.let { " · To win ${money(it)}" } ?: ""
         if (before.status == ParlayStatus.LOST) return emptyList()
         if (after.status == ParlayStatus.WON && before.status != ParlayStatus.WON) {
-            return listOf(Msg("PARLAY CASHED: $name", "${after.summary}${w.toWin?.let { " · Won ${money(it)}" } ?: ""}", true))
+            return listOf(Msg("PARLAY CASHED: $name", after.summary, true))
         }
         val out = mutableListOf<Msg>()
         after.legs.forEachIndexed { i, a ->
@@ -118,7 +117,7 @@ object AlertEngine {
                 LegStatus.WON -> {
                     val left = after.legs.filter { !it.status.decided }
                     val next1 = if (left.size == 1) " · One leg away: ${left.single().label}" else ""
-                    out += Msg("Parlay leg hit: ${a.label}", "$name · ${after.summary}$next1$win", true)
+                    out += Msg("Parlay leg hit: ${a.label}", "$name · ${after.summary}$next1", true)
                 }
                 LegStatus.LOST -> if (out.none { it.title.startsWith("Parlay busted") }) {
                     out += Msg("Parlay busted: ${a.label}", "$name · ${after.won} of ${after.legs.size} hit", true)
@@ -156,7 +155,7 @@ object AlertEngine {
         else -> if (winning) "Bet now winning: ${w.displayName}" else "Bet now losing: ${w.displayName}"
     }
 
-    private fun money(d: Double): String = if (d == Math.floor(d)) "$" + d.toLong() else "$" + String.format("%.2f", d)
+
 
     private data class Msg(val title: String, val detail: String?, val big: Boolean)
 

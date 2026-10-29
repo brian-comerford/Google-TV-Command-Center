@@ -89,7 +89,7 @@ payouts, just whether it hit. Alerts fire when a spread or moneyline flips betwe
 parlay legs, the result is saved once decided.
 
 **+ Parlay** builds a parlay from any mix of legs: player props, moneylines, spreads and game totals,
-with optional odds and stake to show what it pays. On the TV, the parlay card lists every leg with ✓ hit,
+and shows only whether it hits, with no odds or payouts. On the TV, the parlay card lists every leg with ✓ hit,
 ✗ lost, ● live (green winning / amber losing) or ○ not started, plus progress bars on prop and total legs,
 and a summary like "2 of 4 hit · 2 to go". Alerts fire when a leg hits (with "One leg away" when it's
 down to one), when the parlay busts, and when it cashes. Each leg is saved as settled the moment it's

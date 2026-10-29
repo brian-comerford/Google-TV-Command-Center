@@ -2,7 +2,6 @@ package com.sportscc.core
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlin.math.abs
 
 // ---------- What the user enters (persisted, synced with the phone site) ----------
 
@@ -76,23 +75,12 @@ data class ParlayWatch(
     val id: String,
     val legs: List<Leg>,
     val name: String = "",
-    /** American odds for the whole parlay, e.g. 1050 for +1050. */
-    val odds: Int? = null,
-    val stake: Double? = null,
     /** When it was built; games that started well before this belong to an earlier slate and are ignored. */
     val createdAt: Long = 0,
 ) : WatchItem {
     override val league: League get() = legs.firstOrNull()?.league ?: League.NFL
     override val key: String get() = "parlay:$id"
     override val displayName: String get() = name.ifBlank { "${legs.size}-leg parlay" }
-
-    /** Profit if every leg wins (before any pushes shorten the parlay). */
-    val toWin: Double?
-        get() {
-            val o = odds ?: return null
-            val s = stake ?: return null
-            return s * (if (o > 0) o / 100.0 else 100.0 / abs(o))
-        }
 }
 
 // ---------- Live evaluation ----------

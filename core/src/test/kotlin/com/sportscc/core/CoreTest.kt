@@ -266,7 +266,6 @@ class ParlayTest {
     private val parlay = ParlayWatch(
         id = "p1",
         name = "Sunday 4-leg",
-        odds = 1050, stake = 10.0,
         legs = listOf(
             PropLeg(League.NFL, "3918298", "Josh Allen", "2", "BUF", Prop("pass_yds", 249.5)),
             MoneylineLeg(League.NFL, "2", "BUF"),
@@ -284,7 +283,6 @@ class ParlayTest {
         assertEquals("1 of 4 hit · 3 to go", s.summary)
         assertEquals("BUF @ MIA U 47.5", s.legs[3].label)
         assertEquals("MIA +3.5", s.legs[2].label)
-        assertEquals(105.0, parlay.toWin!!, 1e-9) // +1050 on $10: $105 profit
 
         val final = Snapshot(games(Fixtures.event("401", "post", "2", "BUF", 24, "15", "MIA", 21)), mapOf("401" to allenBox(262, 0)))
         val f = ParlayEngine.evaluate(parlay, final)
@@ -320,7 +318,7 @@ class ParlayTest {
         val b = Snapshot(games(Fixtures.event("401", "in", "2", "BUF", 21, "15", "MIA", 10)), mapOf("401" to allenBox(262, 0)))
         val hit = AlertEngine.diff(a, b, w, 1).single()
         assertEquals("Parlay leg hit: Josh Allen O 249.5 Pass Yds", hit.title)
-        assertTrue(hit.detail!!, hit.detail!!.endsWith("To win $105"))
+        assertEquals("Sunday 4-leg · 1 of 4 hit · 3 to go", hit.detail)
 
         val c = Snapshot(games(Fixtures.event("401", "in", "2", "BUF", 31, "15", "MIA", 24)), mapOf("401" to allenBox(262, 0)))
         assertEquals("Parlay busted: BUF @ MIA U 47.5", AlertEngine.diff(b, c, w, 2).single().title)
@@ -339,8 +337,7 @@ class ParlayTest {
         val items = SyncCodec.decode(javaClass.getResource("/web-parlay-payload.txt")!!.readText()).items
         val p = items.filterIsInstance<ParlayWatch>().first { it.name == "Sunday 4-leg" }
         assertEquals(listOf("BUF to win", "MIA +3.5", "BUF game U 47.5", "Josh Allen O 249.5 Pass Yds"), p.legs.map { ParlayEngine.label(it) })
-        assertEquals(1050, p.odds)
-        assertEquals(105.0, p.toWin!!, 1e-9)
+        // Older phone-site parlays carried odds and a stake; they still load, the extra fields are ignored.
         assertEquals(2, items.filterIsInstance<ParlayWatch>().size)
     }
 
