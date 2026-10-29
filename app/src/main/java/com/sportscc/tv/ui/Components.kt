@@ -34,7 +34,7 @@ object Palette {
     val Panel = Color(0xFF151B26)
     val PanelHi = Color(0xFF1E2735)
     val Text = Color(0xFFF2F5FA)
-    val Muted = Color(0xFF8B95A7)
+    val Muted = Color(0xFFB4BDCC) // light enough to read from the couch on a dark background
     val Live = Color(0xFFFF3B30)
     val Win = Color(0xFF34C759)
     val Warn = Color(0xFFFFB020)
