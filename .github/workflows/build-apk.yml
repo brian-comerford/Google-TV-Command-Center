@@ -35,7 +35,7 @@ jobs:
       # A release gives a fixed download link you can type into the "Downloader" app on the TV:
       # https://github.com/<owner>/<repo>/releases/latest/download/SportsCommandCenter.apk
       - name: Publish release
-        if: github.event_name != 'pull_request' && github.ref_type != 'tag'
+        if: github.event_name != 'pull_request' && github.ref_type != 'tag' && github.ref_name != 'non-browser'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
@@ -48,10 +48,10 @@ jobs:
             Install on Google TV: open the Downloader app and enter
             https://github.com/${{ github.repository }}/releases/latest/download/SportsCommandCenter.apk
 
-      # Pushing a named tag (e.g. "non-browser") saves that version as its own release with a fixed
-      # download link, without changing what "latest" points to.
+      # A saved version (the "non-browser" branch, or any pushed tag) becomes its own release with a
+      # fixed download link, without changing what "latest" points to.
       - name: Publish saved version
-        if: github.ref_type == 'tag'
+        if: github.event_name != 'pull_request' && (github.ref_type == 'tag' || github.ref_name == 'non-browser')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
