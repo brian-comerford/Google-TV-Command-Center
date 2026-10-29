@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
@@ -49,8 +51,10 @@ fun SccTheme(content: @Composable () -> Unit) {
             onSurface = Palette.Text,
             onBackground = Palette.Text,
         ),
-        content = content,
-    )
+    ) {
+        // Text drawn outside a Surface (e.g. the Watch screen's side cards) otherwise defaults to black.
+        CompositionLocalProvider(LocalContentColor provides Palette.Text, content = content)
+    }
 }
 
 /** D-pad friendly button: grows and turns accent-colored when focused. */

@@ -451,8 +451,8 @@ private fun MiniCard(card: Card) {
             is TeamCard -> {
                 val g = card.game
                 if (g == null) {
-                    Text(card.watch.name, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text("No game today", fontSize = 11.sp, color = Palette.Muted)
+                    Text(card.watch.name, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("No game today", fontSize = 12.sp, color = Palette.Muted)
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -461,32 +461,32 @@ private fun MiniCard(card: Card) {
                         )
                         StatusPill(g)
                     }
-                    if (live) (g.situation ?: g.lastPlay)?.let { Text(it, fontSize = 11.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    if (live) (g.situation ?: g.lastPlay)?.let { Text(it, fontSize = 12.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
             }
             is PlayerCard -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(card.watch.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(card.watch.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     card.fantasy?.takeIf { card.watch.fantasy }?.let { (label, pts) ->
                         Text("${String.format("%.1f", pts)} $label", fontSize = 15.sp, fontWeight = FontWeight.Black, color = Palette.Accent)
                     }
                 }
                 val line = card.chips.take(4).joinToString(" · ") { "${it.value} ${it.label}" }
                 Text(line.ifBlank { card.game?.let { if (it.state == GameState.PRE) formatStart(it) else "No stats yet" } ?: "No game today" },
-                    fontSize = 11.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    fontSize = 12.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (!card.watch.fantasy) card.props.forEach { PropRow(it, card.game?.state) }
             }
             is ParlayCard -> {
                 val st = card.state
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(card.watch.displayName, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(card.watch.displayName, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     when (st.status) {
                         ParlayStatus.WON -> Pill("CASHED", Palette.Win)
                         ParlayStatus.LOST -> Pill("BUSTED", Palette.Live)
                         else -> Unit
                     }
                 }
-                Text(st.summary, fontSize = 11.sp, color = Palette.Muted)
+                Text(st.summary, fontSize = 12.sp, color = Palette.Muted)
                 Spacer(Modifier.height(4.dp))
                 st.legs.forEach { LegRow(it) }
             }
@@ -498,8 +498,8 @@ private fun MiniCard(card: Card) {
                     LegStatus.LIVE_LOSING -> Palette.Warn
                     else -> Palette.Muted
                 }
-                Text(st.label, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                card.game?.takeIf { it.state != GameState.PRE }?.let { Text("${it.scoreLine} · ${it.shortDetail}", fontSize = 11.sp, color = Palette.Muted, maxLines = 1) }
+                Text(st.label, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                card.game?.takeIf { it.state != GameState.PRE }?.let { Text("${it.scoreLine} · ${it.shortDetail}", fontSize = 12.sp, color = Palette.Muted, maxLines = 1) }
                 Text(card.description, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color)
                 val f = st.fraction
                 if (f != null && !st.status.decided && st.status != LegStatus.PENDING) ProgressBar(f.toFloat(), color, Modifier.padding(top = 3.dp))
