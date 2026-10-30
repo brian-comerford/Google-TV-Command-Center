@@ -98,6 +98,20 @@ down the right side and live scores plus the Live Feed scrolling along the botto
   a name. ☆ adds a channel to **Favorites**. **◀ Ch / Ch ▶** (or the remote's channel buttons) step through
   the list you picked from. **Refresh** downloads a linked playlist again. Channel names, logos, groups and
   `#EXTVLCOPT` User-Agent / Referer lines are read from the playlist.
+- **Side by side:** **Split** puts two streams next to each other. ◀ ▶ move between the two sides (the
+  highlighted one has the sound and the remote), ▼ picks a channel for that side, and **Single** (or Back)
+  goes back to one stream, keeping the side you're on.
+- **Streams for games:** press **Games** for today's games (from the leagues on your list). Play a stream
+  (a playlist channel, or an .m3u8 link from your phone), then press **Assign** on its game. From the
+  Channels list, **Game…** assigns a channel without playing it first. **Watch** jumps to a game's stream.
+- **Auto-switch** (toolbar or Games): when a game with a stream gets exciting (a team inside the 20,
+  overtime, or a close game in its final minutes), **Ask** shows "BUF in the red zone · press OK to watch",
+  **Auto** switches by itself, **Off** does neither. It waits 90 seconds between switches. In split screen it
+  replaces the side that isn't showing anything exciting.
+- **Instant switching:** while one stream plays, the next likely one loads silently in the background and is
+  kept near live: a game that's heating up (a drive past midfield, a close game late), or else the next
+  channel in the list. Switching to it starts from what's already loaded. (Not in split screen, where the
+  box is already playing two streams.)
 - **Save** while a stream plays adds it to **Saved**. Streams that need a sign-in, or are copy-protected
   (DRM), won't play. Only use streams and playlists you're entitled to watch.
 - Pop-up windows, new tabs, downloads and links that try to launch other apps are blocked.

@@ -15,6 +15,20 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.IOException
 
+/**
+ * A stream assigned to one game ([gameId] is ESPN's event id), from a playlist channel or a single link.
+ * [label] is the matchup, e.g. "BUF @ MIA", for when the game is no longer on the scoreboard.
+ */
+@Serializable
+data class GameFeed(
+    val gameId: String,
+    val league: com.sportscc.core.League,
+    val label: String,
+    val channel: Channel,
+    val hls: Boolean = false,
+    val savedAt: Long = 0,
+)
+
 /** A channel list. [url] is null when it was sent as a file, so it can't be refreshed. */
 @Serializable
 data class Playlist(val id: String, val name: String, val url: String? = null, val count: Int = 0, val updatedAt: Long = 0)
@@ -33,6 +47,23 @@ class StreamStore(context: Context) {
 
     private val _favorites = MutableStateFlow(read<List<Channel>>("favorites") ?: emptyList())
     val favorites: StateFlow<List<Channel>> = _favorites.asStateFlow()
+
+    // Assignments are for one game, so they're dropped two days after they were made.
+    private val _feeds = MutableStateFlow(
+        (read<List<GameFeed>>("feeds") ?: emptyList()).filter { System.currentTimeMillis() - it.savedAt < 2 * 24 * 60 * 60_000L },
+    )
+    val feeds: StateFlow<List<GameFeed>> = _feeds.asStateFlow()
+
+    fun feedFor(gameId: String): GameFeed? = _feeds.value.firstOrNull { it.gameId == gameId }
+
+    fun assign(feed: GameFeed) = putFeeds(listOf(feed.copy(savedAt = System.currentTimeMillis())) + _feeds.value.filterNot { it.gameId == feed.gameId })
+
+    fun unassign(gameId: String) = putFeeds(_feeds.value.filterNot { it.gameId == gameId })
+
+    private fun putFeeds(list: List<GameFeed>) {
+        _feeds.value = list
+        prefs.edit().putString("feeds", json.encodeToString(list)).apply()
+    }
 
     var last: Channel?
         get() = read("last")

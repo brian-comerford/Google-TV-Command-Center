@@ -63,6 +63,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
+import com.sportscc.core.Action
+import com.sportscc.core.Game
+import com.sportscc.core.Heat
+import com.sportscc.tv.AutoSwitch
+import com.sportscc.tv.stream.GameFeed
+import androidx.compose.runtime.collectAsState
 import com.sportscc.core.Alert
 import com.sportscc.core.BetCard
 import com.sportscc.core.Card
@@ -94,6 +100,22 @@ import kotlinx.coroutines.launch
  * scores plus the feed along the bottom. Stream links (.m3u8 and the like) and channels from .m3u
  * playlists play in a built-in player; everything else opens in the browser.
  */
+/** One side of the video area: a player and what it's showing. */
+private class Pane(val view: StreamPlayerView) {
+    var channel by mutableStateOf<Channel?>(null)
+    /** What channel up / down steps through. */
+    var queue by mutableStateOf<List<Channel>>(emptyList())
+    var status by mutableStateOf(StreamStatus(StreamStatus.State.IDLE))
+    var showInfo by mutableIntStateOf(0)
+    /** The game this stream is assigned to, if any. */
+    var gameId by mutableStateOf<String?>(null)
+    /** Known to be HLS even if the link doesn't say .m3u8. */
+    var hls = false
+}
+
+/** "BUF in the red zone: switch?" for a game with a stream assigned. */
+private data class SwitchPrompt(val feed: GameFeed, val game: Game, val reason: String)
+
 @Composable
 fun WatchScreen(
     cards: List<Card>,
@@ -103,12 +125,16 @@ fun WatchScreen(
     desktop: Boolean,
     saved: List<SavedSite>,
     streams: StreamStore,
+    /** Every game on today's scoreboards, for assigning streams to games. */
+    games: List<Game>,
+    autoSwitch: AutoSwitch,
     homeUrl: String,
     startInput: String?,
     incomingUrl: String?,
     onIncomingHandled: () -> Unit,
     onLayout: (BrowserLayout) -> Unit,
     onDesktop: (Boolean) -> Unit,
+    onAutoSwitch: (AutoSwitch) -> Unit,
     onPage: (String) -> Unit,
     onSave: (SavedSite) -> Unit,
     onRemoveSaved: (String) -> Unit,
@@ -125,8 +151,9 @@ fun WatchScreen(
         }
         return
     }
-    val player = remember { StreamPlayerView(ctx) }
+    val panes = remember { listOf(Pane(StreamPlayerView(ctx)), Pane(StreamPlayerView(ctx))) }
     val scope = rememberCoroutineScope()
+    val feeds by streams.feeds.collectAsState()
 
     var url by remember { mutableStateOf(homeUrl) }
     var title by remember { mutableStateOf<String?>(null) }
@@ -134,39 +161,95 @@ fun WatchScreen(
     var pointer by remember { mutableStateOf(true) }
     var dialog by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf<String?>(null) }
-    // The channel playing (null = showing the browser), and the list channel up/down moves through.
-    var playing by remember { mutableStateOf<Channel?>(null) }
-    var queue by remember { mutableStateOf<List<Channel>>(emptyList()) }
-    var status by remember { mutableStateOf(StreamStatus(StreamStatus.State.IDLE)) }
-    var showInfo by remember { mutableIntStateOf(0) }
     var listId by remember { mutableStateOf<String?>(null) }
+    /** Two streams side by side. */
+    var split by remember { mutableStateOf(false) }
+    /** The side shown when not split. */
+    var primary by remember { mutableIntStateOf(0) }
+    /** The side with the remote and the sound. */
+    var active by remember { mutableIntStateOf(0) }
+    /** A playlist channel being assigned to a game from the Channels list. */
+    var assigning by remember { mutableStateOf<Channel?>(null) }
+    var prompt by remember { mutableStateOf<SwitchPrompt?>(null) }
+    var switchedNote by remember { mutableStateOf<String?>(null) }
+    var lastSwitchAt by remember { mutableStateOf(0L) }
+    /** Games already offered while they're hot, so the same red-zone trip isn't offered twice. */
+    val offered = remember { mutableSetOf<String>() }
     val toolbarFocus = remember { FocusRequester() }
 
+    val cur = panes[active]
+    val anyStream = panes.any { it.channel != null }
+    val showing = if (split) panes else listOf(panes[primary])
+
     fun focusContent() {
-        if (playing != null) player.requestFocus() else browser.requestFocus()
+        if (anyStream) panes[active].view.requestFocus() else browser.requestFocus()
     }
     fun toast(text: String) = Toast.makeText(ctx, text, Toast.LENGTH_LONG).show()
+    fun applySound() = panes.forEachIndexed { i, p -> p.view.muted = split && i != active }
+    fun setActive(i: Int) {
+        active = i.coerceIn(0, 1)
+        applySound()
+        panes[active].showInfo++
+        panes[active].view.requestFocus()
+    }
+    fun feedGame(c: Channel): String? = feeds.firstOrNull { it.channel.url == c.url }?.gameId
 
-    fun play(c: Channel, list: List<Channel>, hls: Boolean = false) {
+    fun play(c: Channel, list: List<Channel>, hls: Boolean = false, side: Int = active) {
         browser.pauseMedia()
-        player.play(c, hls)
-        playing = c
-        queue = list.ifEmpty { listOf(c) }
+        val pane = panes[side]
+        pane.view.play(c, hls)
+        pane.channel = c
+        pane.hls = hls
+        pane.queue = list.ifEmpty { listOf(c) }
+        pane.gameId = feedGame(c)
+        pane.showInfo++
         streams.last = c
-        showInfo++
         dialog = null
-        player.requestFocus()
+        if (!split) primary = side
+        active = side
+        applySound()
+        pane.view.requestFocus()
     }
     fun stopStream() {
-        player.stop()
-        playing = null
+        panes.forEach { it.view.stop(); it.channel = null; it.gameId = null }
+        split = false
+        primary = 0
+        active = 0
         browser.requestFocus()
     }
-    fun step(d: Int) {
-        val c = playing ?: return
-        if (queue.size < 2) return
-        val i = queue.indexOfFirst { it.url == c.url }.coerceAtLeast(0)
-        play(queue[(i + d).mod(queue.size)], queue)
+    fun closeSplit() {
+        val keep = active
+        panes.forEachIndexed { i, p -> if (i != keep) { p.view.stop(); p.channel = null; p.gameId = null } }
+        split = false
+        primary = keep
+        applySound()
+        if (panes[keep].channel == null) stopStream() else panes[keep].view.requestFocus()
+    }
+    fun openSplit() {
+        split = true
+        panes[primary].view.preload(null) // two players are enough for a TV box
+        active = 1 - primary
+        applySound()
+        dialog = "channels" // pick what goes on the other side
+    }
+    fun step(d: Int, side: Int = active) {
+        val pane = panes[side]
+        val c = pane.channel ?: return
+        if (pane.queue.size < 2) return
+        val i = pane.queue.indexOfFirst { it.url == c.url }.coerceAtLeast(0)
+        play(pane.queue[(i + d).mod(pane.queue.size)], pane.queue, side = side)
+    }
+    /** Puts [f]'s stream up: in split screen on the side that isn't showing anything exciting, with the sound. */
+    fun watchFeed(f: GameFeed) {
+        val onScreen = panes.indexOfFirst { it.channel?.url == f.channel.url && (split || it === panes[primary]) }
+        if (onScreen >= 0) { setActive(onScreen); dialog = null; return }
+        val side = if (split) {
+            val hot = panes.map { p -> p.gameId?.let { id -> games.firstOrNull { it.id == id } }?.let { Action.interest(it).heat } == Heat.HOT }
+            if (!hot[1 - active]) 1 - active else if (!hot[active]) active else 1 - active
+        } else primary
+        play(f.channel, panes[side].queue.takeIf { q -> q.any { it.url == f.channel.url } } ?: listOf(f.channel), f.hls, side)
+        panes[side].gameId = f.gameId
+        lastSwitchAt = System.currentTimeMillis()
     }
     fun openInput(input: String) {
         val text = input.trim()
@@ -208,29 +291,40 @@ fun WatchScreen(
         }
         browser.onLoading = { progress = it }
         browser.onExitTop = { runCatching { toolbarFocus.requestFocus() } }
-        player.onExitTop = { runCatching { toolbarFocus.requestFocus() } }
-        player.onDown = { dialog = "channels" }
-        player.onChannelStep = { step(it) }
-        player.onStatus = { st ->
-            status = st
-            if (st.state != StreamStatus.State.PLAYING) showInfo++
+        panes.forEachIndexed { i, pane ->
+            pane.view.onExitTop = { runCatching { toolbarFocus.requestFocus() } }
+            pane.view.onDown = { active = i; dialog = "channels" }
+            pane.view.onChannelStep = { step(it, i) }
+            pane.view.onOk = {
+                val pr = prompt
+                if (pr != null) { prompt = null; watchFeed(pr.feed); true } else false
+            }
+            pane.view.onStatus = { st ->
+                pane.status = st
+                if (st.state != StreamStatus.State.PLAYING) pane.showInfo++
+            }
         }
         browser.setDesktopMode(desktop)
         val first = startInput?.takeIf { it.isNotBlank() }
         if (first != null && M3u.classify(first) == LinkKind.WEB) browser.load(first) else browser.load(homeUrl)
         if (first != null && M3u.classify(first) != LinkKind.WEB) openInput(first)
         onDispose {
-            player.stop()
+            panes.forEach { it.view.stop() }
             browser.destroy()
         }
+    }
+    // Split screen: left / right move between the two sides (and the sound goes with you).
+    LaunchedEffect(split) {
+        panes.forEachIndexed { i, pane -> pane.view.onSideStep = if (split) ({ d -> setActive(i + d) }) else null }
+        applySound()
     }
     // Pause video and sound when you leave the app; pick up again when you come back.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val obs = LifecycleEventObserver { _, e ->
             when (e) {
-                Lifecycle.Event.ON_PAUSE -> { browser.webView.onPause(); player.pause() }
-                Lifecycle.Event.ON_RESUME -> { browser.webView.onResume(); if (playing != null) player.resume() }
+                Lifecycle.Event.ON_PAUSE -> { browser.webView.onPause(); panes.forEach { it.view.pause() } }
+                Lifecycle.Event.ON_RESUME -> { browser.webView.onResume(); panes.forEach { if (it.channel != null) it.view.resume() } }
                 else -> Unit
             }
         }
@@ -248,29 +342,63 @@ fun WatchScreen(
         delay(300)
         if (dialog == null) focusContent()
     }
-    // The channel name shows for a few seconds after a change, and stays while loading or on an error.
-    var infoVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(showInfo, status.state) {
-        infoVisible = true
-        if (status.state == StreamStatus.State.PLAYING) {
-            delay(4_000)
-            infoVisible = false
+
+    // ---- switch to the action, and preload what's next ----
+    val feedGames = remember(games, feeds) { feeds.mapNotNull { f -> games.firstOrNull { it.id == f.gameId }?.let { f to it } } }
+    val onScreenGames = panes.filterIndexed { i, _ -> split || i == primary }.mapNotNull { it.gameId }.toSet()
+    LaunchedEffect(feedGames, onScreenGames, autoSwitch, split, primary, panes[primary].channel, panes[primary].queue) {
+        // Forget offers for games that cooled down, so their next trip to the red zone is offered again.
+        offered.retainAll(feedGames.filter { Action.interest(it.second).heat == Heat.HOT }.map { it.second.id }.toSet())
+        val candidates = feedGames.filter { it.second.id !in onScreenGames }
+        val pick = Action.pick(candidates.map { it.second }, null)
+        val pickFeed = pick?.let { (g, _) -> candidates.first { it.second.id == g.id }.first }
+
+        // Keep the likeliest next stream warm (single view only): an exciting game, else the next channel.
+        val main = panes[primary]
+        if (!split && main.channel != null) {
+            if (pickFeed != null) main.view.preload(pickFeed.channel, pickFeed.hls)
+            else {
+                val q = main.queue
+                val i = q.indexOfFirst { it.url == main.channel?.url }
+                main.view.preload(if (q.size > 1 && i >= 0) q[(i + 1) % q.size] else null)
+            }
+        }
+
+        if (pick == null || pickFeed == null || autoSwitch == AutoSwitch.OFF) return@LaunchedEffect
+        val (game, interest) = pick
+        if (interest.heat != Heat.HOT || game.id in offered) return@LaunchedEffect
+        // Give a switch a minute and a half before the next one, so it doesn't bounce between games.
+        if (System.currentTimeMillis() - lastSwitchAt < 90_000) return@LaunchedEffect
+        offered += game.id
+        val reason = interest.reason ?: "Big moment"
+        if (autoSwitch == AutoSwitch.AUTO) {
+            watchFeed(pickFeed)
+            switchedNote = "Switched: $reason"
+        } else {
+            prompt = SwitchPrompt(pickFeed, game, reason)
         }
     }
-    BackHandler(enabled = dialog == null) {
+    // An offer goes away by itself after 12 seconds; the "Switched" note after 5.
+    LaunchedEffect(prompt) { if (prompt != null) { delay(12_000); prompt = null } }
+    LaunchedEffect(switchedNote) { if (switchedNote != null) { delay(5_000); switchedNote = null } }
+
+    BackHandler(enabled = dialog == null && prompt == null) {
         when {
-            playing != null -> stopStream()
+            split -> closeSplit()
+            anyStream -> stopStream()
             !browser.goBack() -> onExit()
         }
     }
+    BackHandler(enabled = dialog == null && prompt != null) { prompt = null }
     BackHandler(enabled = dialog != null) {
         dialog = null
+        assigning = null
         focusContent()
     }
 
     val showRight = layout == BrowserLayout.FRAMED || layout == BrowserLayout.RIGHT
     val showBottom = layout == BrowserLayout.FRAMED || layout == BrowserLayout.BOTTOM
-    val ch = playing
+    val ch = cur.channel
 
     // Older TVs crop the picture edges (overscan), so keep everything inside a safe margin.
     Box(Modifier.fillMaxSize().background(Palette.Bg).padding(horizontal = 30.dp, vertical = 16.dp)) {
@@ -291,33 +419,40 @@ fun WatchScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    if (ch != null) {
+                    if (anyStream) {
                         FocusButton("Browser", { stopStream() }, Modifier.focusRequester(toolbarFocus), compact = true)
                         FocusButton("Channels", { dialog = "channels" }, compact = true)
-                        if (queue.size > 1) {
+                        FocusButton("Games", { dialog = "games" }, compact = true)
+                        FocusButton(if (split) "Single" else "Split", { if (split) closeSplit() else openSplit() }, selected = split, compact = true)
+                        if (cur.queue.size > 1) {
                             FocusButton("◀ Ch", { step(-1) }, compact = true)
                             FocusButton("Ch ▶", { step(1) }, compact = true)
                         }
-                        FocusButton(if (status.state == StreamStatus.State.PAUSED) "Play" else "Pause", { player.togglePause() }, compact = true)
-                        FocusButton("Retry", { player.retry() }, compact = true)
+                        FocusButton(if (cur.status.state == StreamStatus.State.PAUSED) "Play" else "Pause", { cur.view.togglePause() }, compact = true)
+                        FocusButton("Retry", { cur.view.retry() }, compact = true)
                         FocusButton("Search", { dialog = "open" }, compact = true)
                         FocusButton("Saved", { dialog = "saved" }, compact = true)
-                        FocusButton("Save", { onSave(SavedSite(ch.name, M3u.PLAY_PREFIX + M3u.link(ch))) }, compact = true)
+                        if (ch != null) FocusButton("Save", { onSave(SavedSite(ch.name, M3u.PLAY_PREFIX + M3u.link(ch))) }, compact = true)
                     } else {
                         FocusButton("Back", { if (!browser.goBack()) onExit() }, Modifier.focusRequester(toolbarFocus), compact = true)
                         FocusButton("Search", { dialog = "open" }, compact = true)
                         FocusButton("Channels", { dialog = "channels" }, compact = true)
+                        FocusButton("Games", { dialog = "games" }, compact = true)
                         FocusButton("Saved", { dialog = "saved" }, compact = true)
                         FocusButton("Save", { onSave(SavedSite(title?.takeIf { it.isNotBlank() } ?: url, url)) }, compact = true)
                         FocusButton("Reload", { browser.reload() }, compact = true)
                         FocusButton(if (pointer) "Pointer" else "Scroll", { pointer = !pointer }, selected = true, compact = true)
                         FocusButton(if (desktop) "Desktop" else "Mobile", { onDesktop(!desktop) }, compact = true)
                     }
+                    FocusButton("Auto-switch: ${autoSwitch.label}", { onAutoSwitch(autoSwitch.next()) }, selected = autoSwitch != AutoSwitch.OFF, compact = true)
                     FocusButton("Layout", { onLayout(layout.next()) }, compact = true)
                     FocusButton("Exit", onExit, accent = Palette.Live, compact = true)
                 }
+                val hint = if (split) "◀ ▶ switch side (sound follows) · ▼ channels" else "OK pause · ◀ ▶ skip 10 s · ▼ channels"
                 val line = busy ?: if (ch != null) {
-                    "▶ ${ch.name}" + (ch.group?.let { "  ·  $it" } ?: "") + "  ·  OK pause · ◀ ▶ skip 10 s · ▼ channels"
+                    "▶ ${ch.name}" + (ch.group?.let { "  ·  $it" } ?: "") + "  ·  $hint"
+                } else if (anyStream) {
+                    "Empty side: press ▼ for channels, or Games"
                 } else {
                     listOfNotNull(title?.takeIf { it.isNotBlank() }, url.takeIf { it.startsWith("http") }).joinToString("  ·  ").ifBlank { url }
                 }
@@ -327,17 +462,44 @@ fun WatchScreen(
                     modifier = Modifier.padding(start = 2.dp, bottom = 3.dp),
                 )
                 Box(Modifier.fillMaxWidth().height(2.dp)) {
-                    if (ch == null && progress in 1..99) ProgressBar(progress / 100f, Palette.Accent, Modifier.height(2.dp))
+                    if (!anyStream && progress in 1..99) ProgressBar(progress / 100f, Palette.Accent, Modifier.height(2.dp))
                 }
-                // The browser and player stay in the same place in the tree whatever the layout, so they're never rebuilt.
+                // The browser and both players stay in the same place in the tree whatever the layout, so they're never rebuilt.
                 Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(6.dp))) {
                     AndroidView(factory = { browser }, modifier = Modifier.fillMaxSize())
-                    AndroidView(
-                        factory = { player },
-                        modifier = Modifier.fillMaxSize(),
-                        update = { it.visibility = if (ch != null) View.VISIBLE else View.INVISIBLE },
-                    )
-                    if (ch != null) StreamInfo(ch, status, infoVisible, Modifier.align(Alignment.BottomStart))
+                    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(if (split) 6.dp else 0.dp)) {
+                        panes.forEachIndexed { i, pane ->
+                            val visible = anyStream && pane in showing
+                            Box(
+                                (if (visible) Modifier.weight(1f) else Modifier.width(0.dp)).fillMaxHeight()
+                                    .then(if (split && i == active) Modifier.border(3.dp, Palette.Accent, RoundedCornerShape(6.dp)) else Modifier),
+                            ) {
+                                AndroidView(
+                                    factory = { pane.view },
+                                    modifier = Modifier.fillMaxSize().padding(if (split) 3.dp else 0.dp),
+                                    update = { it.visibility = if (visible) View.VISIBLE else View.INVISIBLE },
+                                )
+                                if (visible) {
+                                    val c = pane.channel
+                                    if (c != null) PaneInfo(c, pane, Modifier.align(Alignment.BottomStart))
+                                    else Text(
+                                        "Press ▼ for channels, or Games",
+                                        fontSize = 15.sp, color = Palette.Muted, modifier = Modifier.align(Alignment.Center),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    prompt?.let { pr ->
+                        SwitchOffer(pr, Modifier.align(Alignment.TopCenter), grabFocus = !anyStream, onWatch = { prompt = null; watchFeed(pr.feed) }, onIgnore = { prompt = null; focusContent() })
+                    }
+                    switchedNote?.let { note ->
+                        Text(
+                            note, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                            modifier = Modifier.align(Alignment.TopCenter).padding(10.dp).clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xCC000000)).padding(horizontal = 14.dp, vertical = 8.dp),
+                        )
+                    }
                 }
                 if (showBottom) BottomTicker(cards, feed)
             }
@@ -348,7 +510,7 @@ fun WatchScreen(
 
         when (dialog) {
             "open" -> OpenDialog(
-                initial = if (ch == null && url.startsWith("http")) url else "",
+                initial = if (!anyStream && url.startsWith("http")) url else "",
                 onGo = { text -> openInput(text) },
                 onCancel = { dialog = null; focusContent() },
             )
@@ -364,11 +526,66 @@ fun WatchScreen(
                 onSelect = { listId = it },
                 playing = ch,
                 onPlay = { c, list -> play(c, list) },
+                onAssign = { c -> assigning = c; dialog = "games" },
                 onAdd = { dialog = "open" },
                 onMessage = { toast(it) },
                 onClose = { dialog = null; focusContent() },
             )
+            "games" -> GamesDialog(
+                games = games,
+                feeds = feeds,
+                myGameIds = cards.mapNotNull { it.game?.id }.toSet(),
+                assigning = assigning ?: ch,
+                fromChannels = assigning != null,
+                autoSwitch = autoSwitch,
+                onAutoSwitch = { onAutoSwitch(autoSwitch.next()) },
+                onWatch = { f -> watchFeed(f) },
+                onAssign = { g, c ->
+                    val hls = panes.firstOrNull { it.channel?.url == c.url }?.hls ?: false
+                    streams.assign(GameFeed(g.id, g.league, "${g.away.abbreviation} @ ${g.home.abbreviation}", c, hls))
+                    panes.forEach { p -> if (p.channel?.url == c.url) p.gameId = g.id }
+                    toast("${c.name} is now the stream for ${g.away.abbreviation} @ ${g.home.abbreviation}")
+                    if (assigning != null) { assigning = null; dialog = "channels" }
+                },
+                onUnassign = { id -> streams.unassign(id); panes.forEach { p -> if (p.gameId == id) p.gameId = null } },
+                onClose = { val back = assigning != null; assigning = null; dialog = if (back) "channels" else null; if (!back) focusContent() },
+            )
         }
+    }
+}
+
+/** The channel name and status over the bottom of one side. */
+@Composable
+private fun PaneInfo(c: Channel, pane: Pane, modifier: Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(pane.showInfo, pane.status.state) {
+        visible = true
+        if (pane.status.state == StreamStatus.State.PLAYING) {
+            delay(4_000)
+            visible = false
+        }
+    }
+    StreamInfo(c, pane.status, visible, modifier)
+}
+
+/** "BUF in the red zone (MIA 12) · OK to watch BUF @ MIA". */
+@Composable
+private fun SwitchOffer(p: SwitchPrompt, modifier: Modifier, grabFocus: Boolean, onWatch: () -> Unit, onIgnore: () -> Unit) {
+    // Over a stream, OK answers it without moving focus; over a web page, the Watch button takes focus.
+    val watchFocus = remember { FocusRequester() }
+    LaunchedEffect(p, grabFocus) { if (grabFocus) watchFocus.requestFocusWhenReady() }
+    Row(
+        modifier.padding(10.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xE6151B26))
+            .border(2.dp, Palette.Live, RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.padding(end = 12.dp)) {
+            Text(p.reason, fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text("Press OK to watch ${p.feed.label} (${p.feed.channel.name}) · Back to ignore", fontSize = 13.sp, color = Palette.Muted)
+        }
+        FocusButton("Watch", onWatch, Modifier.focusRequester(watchFocus), accent = Palette.Win, compact = true)
+        Spacer(Modifier.width(6.dp))
+        FocusButton("Ignore", onIgnore, compact = true)
     }
 }
 

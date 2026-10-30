@@ -43,6 +43,8 @@ data class Dashboard(
     val anyLive: Boolean,
     val updatedAt: Long,
     val errors: List<String>,
+    /** Every game on the scoreboards fetched (the leagues on your list), for assigning streams to games. */
+    val games: List<Game> = emptyList(),
 )
 
 data class ParlayCard(override val watch: ParlayWatch, override val game: Game?, val state: ParlayState) : Card
@@ -156,7 +158,7 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
                     }
                 }
             }
-            return Dashboard(cards, cards.any { it.game?.state == GameState.IN }, now, errors)
+            return Dashboard(cards, cards.any { it.game?.state == GameState.IN }, now, errors, snap.games.values.toList())
         }
     }
 }

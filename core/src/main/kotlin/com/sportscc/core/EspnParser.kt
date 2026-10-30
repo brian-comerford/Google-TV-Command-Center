@@ -34,6 +34,7 @@ object EspnParser {
             else -> GameState.PRE
         }
         val situation = comp.obj("situation")
+        val possession = situation.str("possession")?.takeIf { it.isNotBlank() }
         return Game(
             id = event.str("id") ?: return null,
             league = league,
@@ -47,7 +48,9 @@ object EspnParser {
             away = away,
             situation = situationText(situation, league.kind),
             lastPlay = situation.obj("lastPlay").str("text")?.takeIf { it.isNotBlank() },
-            possessionTeamId = situation.str("possession")?.takeIf { it.isNotBlank() },
+            possessionTeamId = possession,
+            redZone = situation.bool("isRedZone") == true,
+            yardsToGoal = if (league.kind == SportKind.FOOTBALL) yardsToGoal(situation.str("possessionText"), possession, home, away) else null,
             broadcast = comp.arr("broadcasts").firstOrNull()?.arr("names")?.firstOrNull()?.prim()
                 ?: comp.arr("geoBroadcasts").firstOrNull()?.obj("media").str("shortName"),
         )
@@ -75,6 +78,16 @@ object EspnParser {
             record = record,
             isHome = el.str("homeAway") == "home",
         )
+    }
+
+    /** "MIA 34" with Buffalo on offense is 34 yards to go; "BUF 25" is 75. Midfield is "50". */
+    private fun yardsToGoal(text: String?, possession: String?, home: Competitor, away: Competitor): Int? {
+        val t = text?.trim() ?: return null
+        val yard = t.substringAfterLast(' ').toIntOrNull() ?: return null
+        if (!t.contains(' ')) return yard.takeIf { it == 50 }
+        val side = t.substringBeforeLast(' ').trim()
+        val offense = listOf(home, away).firstOrNull { it.teamId == possession } ?: return null
+        return if (side.equals(offense.abbreviation, ignoreCase = true)) 100 - yard else yard
     }
 
     private fun situationText(s: JsonObject?, kind: SportKind): String? {

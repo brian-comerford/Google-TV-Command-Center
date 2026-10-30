@@ -84,6 +84,10 @@ data class Game(
     val lastPlay: String? = null,
     val possessionTeamId: String? = null,
     val broadcast: String? = null,
+    /** Football: the team with the ball is inside the opponent's 20. */
+    val redZone: Boolean = false,
+    /** Football: how far the team with the ball is from the end zone. */
+    val yardsToGoal: Int? = null,
 ) {
     fun involves(teamId: String) = home.teamId == teamId || away.teamId == teamId
     fun competitor(teamId: String) = if (home.teamId == teamId) home else if (away.teamId == teamId) away else null

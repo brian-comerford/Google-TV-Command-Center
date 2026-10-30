@@ -34,7 +34,15 @@ data class AppSettings(
     val browserLayout: BrowserLayout = BrowserLayout.FRAMED,
     /** Ask sites for their desktop version (often better for video players). */
     val browserDesktop: Boolean = false,
+    /** Watch screen: what to do when a game with a stream assigned gets exciting (red zone, close finish). */
+    val autoSwitch: AutoSwitch = AutoSwitch.ASK,
 )
+
+enum class AutoSwitch(val label: String) {
+    ASK("Ask"), AUTO("Auto"), OFF("Off");
+
+    fun next(): AutoSwitch = entries[(ordinal + 1) % entries.size]
+}
 
 enum class KeepAwake { LIVE, ALWAYS, NEVER }
 

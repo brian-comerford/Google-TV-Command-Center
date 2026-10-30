@@ -66,6 +66,8 @@ fun ChannelsDialog(
     onSelect: (String) -> Unit,
     playing: Channel?,
     onPlay: (Channel, List<Channel>) -> Unit,
+    /** Pick the game this channel is the stream for. */
+    onAssign: ((Channel) -> Unit)? = null,
     onAdd: () -> Unit,
     onMessage: (String) -> Unit,
     onClose: () -> Unit,
@@ -202,6 +204,7 @@ fun ChannelsDialog(
                         favorite = c.url in favUrls,
                         onPlay = { onPlay(c, shown) },
                         onFavorite = { streams.toggleFavorite(c) },
+                        onAssign = onAssign?.let { f -> { f(c) } },
                         modifier = if (i == target) Modifier.focusRequester(firstFocus) else Modifier,
                     )
                 }
@@ -211,7 +214,15 @@ fun ChannelsDialog(
 }
 
 @Composable
-private fun ChannelRow(c: Channel, isPlaying: Boolean, favorite: Boolean, onPlay: () -> Unit, onFavorite: () -> Unit, modifier: Modifier) {
+private fun ChannelRow(
+    c: Channel,
+    isPlaying: Boolean,
+    favorite: Boolean,
+    onPlay: () -> Unit,
+    onFavorite: () -> Unit,
+    onAssign: (() -> Unit)?,
+    modifier: Modifier,
+) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(
             onClick = onPlay,
@@ -238,5 +249,6 @@ private fun ChannelRow(c: Channel, isPlaying: Boolean, favorite: Boolean, onPlay
             }
         }
         FocusButton(if (favorite) "★" else "☆", onFavorite, selected = favorite, accent = Palette.Warn, compact = true)
+        onAssign?.let { FocusButton("Game…", it, compact = true) }
     }
 }

@@ -39,6 +39,10 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
     var onDown: (() -> Unit)? = null
     var onChannelStep: ((Int) -> Unit)? = null
     var onStatus: ((StreamStatus) -> Unit)? = null
+    /** OK pressed; return true to take it (e.g. to accept a "switch to this game?" prompt) instead of pausing. */
+    var onOk: (() -> Boolean)? = null
+    /** Split screen: left/right move between the two sides instead of skipping. */
+    var onSideStep: ((Int) -> Unit)? = null
 
     var current: Channel? = null
         private set
@@ -61,11 +65,72 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
         addView(view, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
-    /** Plays [channel]. [isHls] says it's HLS when the link alone doesn't show it. */
+    /**
+     * Plays [channel]. [isHls] says it's HLS when the link alone doesn't show it. If it's the stream
+     * [preload] has been keeping warm, that player takes over and starts from what it already buffered.
+     */
     fun play(channel: Channel, isHls: Boolean = false) {
         current = channel
         hls = isHls
+        val warm = standby?.takeIf { standbyChannel?.url == channel.url && it.playerError == null }
+        standby = null
+        standbyChannel = null
+        stopRefreshing()
         release()
+        val p = warm ?: build(channel, isHls)
+        player = p
+        p.volume = if (muted) 0f else 1f
+        view.player = p
+        p.playWhenReady = true
+        if (warm == null) p.prepare()
+        onStatus?.invoke(StreamStatus(if (warm != null && p.playbackState == Player.STATE_READY) StreamStatus.State.PLAYING else StreamStatus.State.LOADING))
+    }
+
+    /** Silences this player (the other side of a split screen). */
+    var muted = false
+        set(value) {
+            field = value
+            player?.volume = if (value) 0f else 1f
+        }
+
+    /**
+     * Loads [channel] in the background, silent and off screen, so [play] can switch to it right away.
+     * Live streams are moved back to the live edge every few seconds so the switch isn't behind.
+     * Only one stream is kept warm; null lets it go.
+     */
+    fun preload(channel: Channel?, isHls: Boolean = false) {
+        if (channel?.url == standbyChannel?.url) return
+        stopRefreshing()
+        standby?.release()
+        standby = null
+        standbyChannel = null
+        if (channel == null || channel.url == current?.url) return
+        standby = build(channel, isHls).apply {
+            volume = 0f
+            playWhenReady = false
+            prepare()
+        }
+        standbyChannel = channel
+        handler.postDelayed(refresh, REFRESH_MS)
+    }
+
+    /** The stream [preload] is keeping warm, if any. */
+    val preloaded: Channel? get() = standbyChannel
+
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val refresh = object : Runnable {
+        override fun run() {
+            standby?.let { if (it.isCurrentMediaItemLive && it.playerError == null) it.seekToDefaultPosition() }
+            if (standby != null) handler.postDelayed(this, REFRESH_MS)
+        }
+    }
+
+    private fun stopRefreshing() = handler.removeCallbacks(refresh)
+
+    private var standby: ExoPlayer? = null
+    private var standbyChannel: Channel? = null
+
+    private fun build(channel: Channel, isHls: Boolean): ExoPlayer {
         val headers = channel.headers
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent(headers["User-Agent"] ?: USER_AGENT)
@@ -77,11 +142,12 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
             .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, http)))
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(10_000)
-            .setAudioAttributes(AudioAttributes.Builder().setUsage(androidx.media3.common.C.USAGE_MEDIA).setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
+            // Only the player on screen asks for audio focus, so a preloading one never pauses it.
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(androidx.media3.common.C.USAGE_MEDIA).setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE).build(), false)
             .build()
         p.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(state: Int) = report()
-            override fun onIsPlayingChanged(isPlaying: Boolean) = report()
+            override fun onPlaybackStateChanged(state: Int) { if (p === player) report() }
+            override fun onIsPlayingChanged(isPlaying: Boolean) { if (p === player) report() }
             override fun onPlayerError(error: PlaybackException) {
                 // Paused too long on a live stream: jump back to live instead of failing.
                 if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
@@ -89,7 +155,7 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
                     p.prepare()
                     return
                 }
-                onStatus?.invoke(StreamStatus(StreamStatus.State.ERROR, describe(error)))
+                if (p === player) onStatus?.invoke(StreamStatus(StreamStatus.State.ERROR, describe(error)))
             }
         })
         val item = MediaItem.Builder().setUri(channel.url)
@@ -97,11 +163,7 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
             item.setMimeType(MimeTypes.APPLICATION_M3U8)
         }
         p.setMediaItem(item.build())
-        p.playWhenReady = true
-        p.prepare()
-        view.player = p
-        player = p
-        onStatus?.invoke(StreamStatus(StreamStatus.State.LOADING))
+        return p
     }
 
     fun retry() {
@@ -123,6 +185,7 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
     /** The app went to the background. */
     fun pause() {
         player?.pause()
+        preload(null) // the Watch screen asks again when you come back
     }
 
     fun resume() {
@@ -134,6 +197,7 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
 
     /** Stops and lets go of the stream (and the network). */
     fun stop() {
+        preload(null)
         release()
         current = null
         onStatus?.invoke(StreamStatus(StreamStatus.State.IDLE))
@@ -170,6 +234,17 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
         if (!handled) return super.dispatchKeyEvent(event)
         if (event.action != KeyEvent.ACTION_DOWN) return true
         val p = player
+        val center = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+        if (center && event.repeatCount == 0 && onOk?.invoke() == true) return true
+        val side = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> -1
+            KeyEvent.KEYCODE_DPAD_RIGHT -> 1
+            else -> 0
+        }
+        if (side != 0 && onSideStep != null) {
+            if (event.repeatCount == 0) onSideStep?.invoke(side)
+            return true
+        }
         when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> onExitTop?.invoke()
             KeyEvent.KEYCODE_DPAD_DOWN -> if (event.repeatCount == 0) onDown?.invoke()
@@ -185,6 +260,7 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
     }
 
     companion object {
+        private const val REFRESH_MS = 8_000L
         private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 12; Google TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
         fun describe(e: PlaybackException): String = when (e.errorCode) {
