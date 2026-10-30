@@ -131,6 +131,16 @@ and a summary like "2 of 4 hit · 2 to go". Alerts fire when a leg hits (with "O
 down to one), when the parlay busts, and when it cashes. Each leg is saved as settled the moment it's
 decided, so results don't reset when the scoreboard moves on to the next day or week.
 
+**Sleeper** adds your Sleeper fantasy team: enter your Sleeper username (no password), pick the league,
+and choose this week's starters or the whole roster. They're added as fantasy players (live stats + PPR).
+With **Keep it matched to my lineup** on, the TV checks Sleeper every few hours and adds or drops players
+as you change your lineup, with a "Lineup updated from Sleeper" note in the Live Feed. Players you added
+yourself are never touched. Team defenses can't be tracked. **Stop** keeps the players but stops the updates.
+
+**On pace for:** during a game, prop bars, parlay and bet legs, game totals and fantasy scores also say where
+the number is headed at the current rate ("On pace for 287"), in green if that pace wins the bet and amber if
+not. It's a straight-line projection over the game clock, shown once about a fifth of the game has been played.
+
 **Import picks** loads today's recommended bets from
 [Player Prop Finder](https://brian-comerford.github.io/Player-Prop-Finder/) (NFL), best edge first,
 filterable by confidence. Tick the ones you bet and they're added with their lines, or tap

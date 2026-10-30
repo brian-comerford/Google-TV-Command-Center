@@ -40,6 +40,8 @@ data class PlayerWatch(
     val props: List<Prop> = emptyList(),
     /** Followed for fantasy: the card leads with the live fantasy score and there are no lines to set. */
     val fantasy: Boolean = false,
+    /** "sleeper" when it came from your Sleeper lineup, which keeps it up to date (see [SleeperLineup]). */
+    val source: String? = null,
 ) : WatchItem {
     override val key: String get() = "player:${league.name}:$athleteId"
     override val displayName: String get() = name

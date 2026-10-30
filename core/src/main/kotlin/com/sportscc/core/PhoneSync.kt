@@ -22,7 +22,13 @@ import kotlin.random.Random
 
 /** What the phone website and the TV send each other: the whole watchlist. */
 @Serializable
-data class SyncPayload(val v: Int = 1, val items: List<WatchItem>, val sentAt: Long = 0)
+data class SyncPayload(
+    val v: Int = 1,
+    val items: List<WatchItem>,
+    val sentAt: Long = 0,
+    /** The Sleeper league the TV keeps your fantasy players matched to, if any. */
+    val sleeper: SleeperLink? = null,
+)
 
 /**
  * Wire format shared with web/app.js: "z1:" + base64(gzip(json)). Plain JSON is accepted too.

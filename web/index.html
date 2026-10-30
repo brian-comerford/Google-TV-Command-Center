@@ -82,6 +82,7 @@
         <h2>Your list</h2>
         <div class="row">
           <button class="btn" id="importBtn" type="button">Import picks</button>
+          <button class="btn" id="sleeperBtn" type="button">Sleeper</button>
           <button class="btn" id="betBtn" type="button">+ Bet</button>
           <button class="btn" id="parlayBtn" type="button">+ Parlay</button>
           <button class="btn primary" id="addBtn" type="button">+ Add</button>
@@ -137,6 +138,37 @@
           <button class="btn" id="importParlay" type="button" disabled>Make a parlay</button>
           <button class="btn primary" id="importGo" type="button" disabled>Add to my list</button>
         </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Import a Sleeper fantasy lineup -->
+  <dialog id="sleeperDialog">
+    <div class="sheet sleeper-sheet">
+      <div class="row between">
+        <h3>Sleeper fantasy</h3>
+        <button class="btn ghost" id="sleeperClose" type="button">Close</button>
+      </div>
+      <div id="sleeperLinked" class="linkedbox" hidden></div>
+      <form id="sleeperForm" class="row" autocomplete="off">
+        <label for="sleeperUser" class="sr">Sleeper username</label>
+        <input id="sleeperUser" placeholder="Your Sleeper username" autocapitalize="off" enterkeyhint="search">
+        <button class="btn primary" type="submit">Find my leagues</button>
+      </form>
+      <p class="muted small" id="sleeperStatus">Adds the players on your Sleeper team as fantasy players (live stats + PPR). No password needed.</p>
+      <div id="sleeperLeagues" class="picker" hidden></div>
+      <div id="sleeperOptions" hidden>
+        <div class="chips" role="group" aria-label="Which players">
+          <button type="button" class="chip-btn on" data-sl="starters">This week's starters</button>
+          <button type="button" class="chip-btn" data-sl="all">Whole roster</button>
+        </div>
+        <label class="checkrow"><input type="checkbox" id="sleeperAuto" checked>
+          <span>Keep it matched to my lineup: the TV checks Sleeper every few hours and adds or drops players as you set your lineup.</span></label>
+        <div id="sleeperPlayers" class="picker"></div>
+      </div>
+      <div class="row between">
+        <span class="muted small" id="sleeperCount"></span>
+        <button class="btn primary" id="sleeperGo" type="button" disabled>Add to my list</button>
       </div>
     </div>
   </dialog>

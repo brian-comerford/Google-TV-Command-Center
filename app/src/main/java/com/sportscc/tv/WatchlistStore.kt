@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import com.sportscc.core.SleeperLink
 import kotlinx.serialization.json.Json
 
 @Serializable
@@ -53,6 +54,16 @@ class WatchlistStore(context: Context) {
 
     private val _settings = MutableStateFlow(load<AppSettings>(KEY_SETTINGS) ?: AppSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    /** The Sleeper team your fantasy players follow (set from the phone), or null. */
+    private val _sleeper = MutableStateFlow(load<SleeperLink>(KEY_SLEEPER))
+    val sleeper: StateFlow<SleeperLink?> = _sleeper.asStateFlow()
+
+    fun setSleeper(link: SleeperLink?) {
+        if (link == _sleeper.value) return
+        _sleeper.value = link
+        prefs.edit().putString(KEY_SLEEPER, link?.let { json.encodeToString(it) }).apply()
+    }
 
     private inline fun <reified T> load(key: String): T? =
         prefs.getString(key, null)?.let { runCatching { json.decodeFromString<T>(it) }.getOrNull() }
@@ -114,5 +125,6 @@ class WatchlistStore(context: Context) {
     private companion object {
         const val KEY_WATCHLIST = "watchlist"
         const val KEY_SETTINGS = "settings"
+        const val KEY_SLEEPER = "sleeper"
     }
 }

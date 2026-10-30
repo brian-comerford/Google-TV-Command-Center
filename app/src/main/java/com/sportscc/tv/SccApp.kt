@@ -18,6 +18,8 @@ class SccApp : Application() {
         private set
     lateinit var updates: UpdateManager
         private set
+    lateinit var sleeper: SleeperManager
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -25,7 +27,9 @@ class SccApp : Application() {
         browser = com.sportscc.tv.browser.BrowserStore(this)
         streams = com.sportscc.tv.stream.StreamStore(this)
         engine = TrackerEngine(store)
-        sync = PhoneSyncManager(this, store) { engine.notify(it) }
+        sleeper = SleeperManager(store) { engine.notify(it) }
+        sleeper.start()
+        sync = PhoneSyncManager(this, store, notify = { engine.notify(it) }, onApplied = { sleeper.refreshSoon() })
         updates = UpdateManager(this) { engine.notify(it) }
         updates.start()
         MainScope().launch {

@@ -167,3 +167,16 @@ dialog::backdrop { background: rgba(0, 0, 0, .6); }
   .section-head > .row { width: 100%; }
   .section-head > .row .btn { flex: 1; padding-inline: 6px; font-size: 14px; }
 }
+
+/* Sleeper import */
+.sleeper-sheet { grid-template-rows: auto auto auto auto auto 1fr auto; }
+.linkedbox[hidden] { display: none; }
+.linkedbox { background: var(--panel-hi); border-radius: 10px; padding: 10px 12px; font-size: 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.checkrow { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; font-size: 13px; color: var(--muted); margin: 10px 0; }
+.checkrow input { width: 20px; height: 20px; accent-color: var(--win); margin: 0; }
+.sleeper-league { text-align: left; }
+.sleeper-league.on { outline: 2px solid var(--accent); }
+.splayer { display: flex; gap: 10px; align-items: center; background: var(--panel-hi); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.splayer .sub { color: var(--muted); font-size: 12px; }
+.splayer.miss { opacity: .55; }
+.badge.sleeper { background: #2b1f4d; color: #c9b6ff; }

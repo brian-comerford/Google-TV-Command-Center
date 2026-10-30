@@ -35,7 +35,13 @@ data class SyncStatus(val lastFromPhone: Long? = null, val error: String? = null
  * Links the TV to the phone website through public relays (several at once, see [Relays]). The phone posts the whole watchlist to
  * this TV's inbox channel; the TV posts its own list to a second channel so the website can load it.
  */
-class PhoneSyncManager(context: Context, private val store: WatchlistStore, private val notify: (Alert) -> Unit) {
+class PhoneSyncManager(
+    context: Context,
+    private val store: WatchlistStore,
+    private val notify: (Alert) -> Unit,
+    /** Called after a new list from the phone is applied. */
+    private val onApplied: () -> Unit = {},
+) {
     private val prefs = context.getSharedPreferences("scc_sync", Context.MODE_PRIVATE)
     private val relays = Relays(timeoutMs = 8_000)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -109,7 +115,7 @@ class PhoneSyncManager(context: Context, private val store: WatchlistStore, priv
         runCatching {
             relays.publish(
                 PairingCode.stateTopic(_code.value),
-                SyncCodec.encode(SyncPayload(items = store.watchlist.value, sentAt = System.currentTimeMillis())),
+                SyncCodec.encode(SyncPayload(items = store.watchlist.value, sentAt = System.currentTimeMillis(), sleeper = store.sleeper.value)),
             )
         }.onFailure { Log.w(TAG, "publish failed", it) }
     }
@@ -170,6 +176,8 @@ class PhoneSyncManager(context: Context, private val store: WatchlistStore, priv
 
     private fun apply(p: SyncPayload) {
         store.replaceAll(p.items)
+        store.setSleeper(p.sleeper)
+        onApplied()
         val now = System.currentTimeMillis()
         prefs.edit().putLong(KEY_LAST_TIME, now).apply()
         _status.value = SyncStatus(lastFromPhone = now)
