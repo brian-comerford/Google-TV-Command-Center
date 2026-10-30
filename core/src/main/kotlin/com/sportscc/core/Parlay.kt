@@ -95,7 +95,20 @@ data class LegState(
     /** 0..1 progress toward the line, for prop and total legs. */
     val fraction: Double?,
     val value: Double?,
-)
+    /** "On pace for" (prop and total legs in a live game, see [Pace]). */
+    val projected: Double? = null,
+) {
+    /** Whether the pace says this leg ends up winning; null without a pace. */
+    val paceWinning: Boolean?
+        get() {
+            val p = projected ?: return null
+            return when (leg) {
+                is PropLeg -> if (leg.prop.side == Prop.Side.OVER) p > leg.prop.line else p <= leg.prop.line
+                is TotalLeg -> if (leg.side == Prop.Side.OVER) p > leg.line else p <= leg.line
+                else -> null
+            }
+        }
+}
 
 enum class ParlayStatus { PENDING, LIVE, WON, LOST, PUSH }
 
@@ -207,7 +220,8 @@ object ParlayEngine {
             over -> LegStatus.LIVE_LOSING
             else -> LegStatus.LIVE_WINNING
         }
-        return LegState(leg, game, status, label, nowText(leg, value, game), fractionFor(leg, value), value)
+        val projected = if (status == LegStatus.LIVE_WINNING || status == LegStatus.LIVE_LOSING) Pace.project(value, game) else null
+        return LegState(leg, game, status, label, nowText(leg, value, game), fractionFor(leg, value), value, projected)
     }
 
     private fun fractionFor(leg: Leg, value: Double?): Double? {

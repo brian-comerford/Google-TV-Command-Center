@@ -4,8 +4,16 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-data class PropProgress(val prop: Prop, val def: StatDef, val current: Double) {
+data class PropProgress(
+    val prop: Prop,
+    val def: StatDef,
+    val current: Double,
+    /** "On pace for" during the game (see [Pace]); null before, after, or too early to say. */
+    val projected: Double? = null,
+) {
     val fraction: Double get() = if (prop.line <= 0) 1.0 else (current / prop.line).coerceIn(0.0, 1.0)
+    /** Whether the pace says the bet ends up winning; null when there's no pace to go on. */
+    val paceWinning: Boolean? get() = projected?.let { if (prop.side == Prop.Side.OVER) it > prop.line else it <= prop.line }
     /** True when the bet is currently winning (over: above the line, under: at or below it). */
     val winning: Boolean get() = if (prop.side == Prop.Side.OVER) current > prop.line else current <= prop.line
 }
@@ -25,6 +33,8 @@ data class PlayerCard(
     val props: List<PropProgress>,
     /** Standard fantasy score for the sport, when one is defined (PPR / DraftKings). */
     val fantasy: Pair<String, Double>?,
+    /** Where the fantasy score is headed at this rate (see [Pace]). */
+    val fantasyPace: Double? = null,
 ) : Card
 
 data class Dashboard(
@@ -137,12 +147,12 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
                     is PlayerWatch -> {
                         val g = gameForTeam(snap.games.values, w.league, w.teamId)
                         val line = g?.let { snap.boxes[it.id]?.players?.get(w.athleteId) }
-                        val props = AlertEngine.propProgress(w, line)
+                        val props = AlertEngine.propProgress(w, line, g)
                         val fantasyDef = StatCatalog.fantasy(w.league)
                         // Fantasy players show 0.0 before kickoff; for others the chip only appears with stats.
                         val points = fantasyDef?.evaluate(line) ?: if (w.fantasy && fantasyDef != null) 0.0 else null
                         val fantasy = points?.let { fantasyDef!!.short to it }
-                        PlayerCard(w, g, line, StatFormat.chips(w.league.kind, line), props, fantasy)
+                        PlayerCard(w, g, line, StatFormat.chips(w.league.kind, line), props, fantasy, points?.let { Pace.project(it, g) })
                     }
                 }
             }

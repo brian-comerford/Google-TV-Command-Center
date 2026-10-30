@@ -83,7 +83,7 @@ object AlertEngine {
 
                     if (newLine != null && (oldLine != null || prevHadBox)) {
                         statAlert(w, g, oldLine, newLine)?.let { (t, d, big) ->
-                            add(w, t, d, big, w.headshot, if (w.fantasy) emptyList() else propProgress(w, newLine))
+                            add(w, t, d, big, w.headshot, if (w.fantasy) emptyList() else propProgress(w, newLine, g))
                         }
                     }
                     if (newLine != null || g.state == GameState.POST) {
@@ -160,9 +160,10 @@ object AlertEngine {
     private data class Msg(val title: String, val detail: String?, val big: Boolean)
 
     /** Every prop on the player, valued from [line], in the order the user added them. */
-    fun propProgress(w: PlayerWatch, line: PlayerLine?): List<PropProgress> = w.props.mapNotNull { p ->
+    fun propProgress(w: PlayerWatch, line: PlayerLine?, game: Game? = null): List<PropProgress> = w.props.mapNotNull { p ->
         val def = StatCatalog.find(w.league, p.statId) ?: return@mapNotNull null
-        PropProgress(p, def, def.evaluate(line) ?: 0.0)
+        val current = def.evaluate(line) ?: 0.0
+        PropProgress(p, def, current, Pace.project(current, game))
     }
 
     private fun teamAlerts(w: TeamWatch, old: Game, g: Game): List<Msg> {

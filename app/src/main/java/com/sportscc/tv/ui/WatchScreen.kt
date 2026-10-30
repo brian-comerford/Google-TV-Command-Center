@@ -502,7 +502,10 @@ private fun MiniCard(card: Card) {
                 card.game?.takeIf { it.state != GameState.PRE }?.let { Text("${it.scoreLine} · ${it.shortDetail}", fontSize = 12.sp, color = Palette.Muted, maxLines = 1) }
                 Text(card.description, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color)
                 val f = st.fraction
-                if (f != null && !st.status.decided && st.status != LegStatus.PENDING) ProgressBar(f.toFloat(), color, Modifier.padding(top = 3.dp))
+                if (f != null && !st.status.decided && st.status != LegStatus.PENDING) {
+                    ProgressBar(f.toFloat(), color, Modifier.padding(top = 3.dp))
+                    PaceText(st.projected, st.paceWinning)
+                }
             }
         }
     }

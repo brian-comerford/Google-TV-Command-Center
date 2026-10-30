@@ -80,6 +80,7 @@ import com.sportscc.core.ParlayStatus
 import com.sportscc.core.PlayerCard
 import com.sportscc.core.decided
 import com.sportscc.core.Prop
+import com.sportscc.core.Pace
 import com.sportscc.core.PropProgress
 import com.sportscc.core.SportKind
 import com.sportscc.core.StatFormat
@@ -383,6 +384,7 @@ private fun PlayerCardView(card: PlayerCard, modifier: Modifier, moving: Boolean
                 Column(horizontalAlignment = Alignment.End) {
                     Text(String.format("%.1f", fantasy.second), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Palette.Accent)
                     Text("${fantasy.first} PTS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Palette.Muted, letterSpacing = 1.sp)
+                    card.fantasyPace?.let { Text("On pace for ${String.format("%.1f", it)}", fontSize = 12.sp, color = Palette.Muted) }
                 }
             }
         }
@@ -441,6 +443,7 @@ private fun BetCardView(card: BetCard, modifier: Modifier, moving: Boolean, onCl
         if (f != null && !st.status.decided && st.status != LegStatus.PENDING) {
             Spacer(Modifier.height(4.dp))
             ProgressBar(f.toFloat(), color)
+            PaceText(st.projected, st.paceWinning)
         }
     }
 }
@@ -499,6 +502,7 @@ internal fun LegRow(l: LegState) {
         val f = l.fraction
         if (f != null && !l.status.decided && l.status != LegStatus.PENDING) {
             ProgressBar(f.toFloat(), color, Modifier.padding(start = 18.dp, top = 2.dp))
+            PaceText(l.projected, l.paceWinning, Modifier.padding(start = 18.dp))
         }
     }
 }
@@ -543,7 +547,19 @@ internal fun PropRow(p: PropProgress, state: GameState?) {
         }
         Spacer(Modifier.height(3.dp))
         ProgressBar(p.fraction.toFloat(), color)
+        if (status == null) PaceText(p.projected, p.paceWinning)
     }
+}
+
+/** "On pace for 287": green if that pace wins the bet, amber if not. Nothing when there's no pace yet. */
+@Composable
+internal fun PaceText(projected: Double?, winning: Boolean?, modifier: Modifier = Modifier) {
+    if (projected == null || winning == null) return
+    Text(
+        "On pace for ${Pace.format(projected)}",
+        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (winning) Palette.Win else Palette.Warn,
+        modifier = modifier.padding(top = 2.dp),
+    )
 }
 
 @Composable

@@ -20,3 +20,13 @@ jobs:
             att=$(printf '#EXTM3U\n' | curl -s -m 15 -o /dev/null -w '%{http_code}' -X POST --data-binary @- "https://$h/$topic?filename=t.m3u" || echo fail)
             echo "$h health=$health publish=$pub read=$got cors=[$cors] attachment=$att"
           done
+
+      - name: Check Sleeper (fantasy import)
+        run: |
+          for u in "https://api.sleeper.app/v1/state/nfl" "https://api.sleeper.app/v1/user/sleeperbot"; do
+            code=$(curl -s -m 15 -o /tmp/body -w '%{http_code}' -H 'Origin: https://example.github.io' "$u" || echo fail)
+            cors=$(curl -s -m 15 -D - -o /dev/null -H 'Origin: https://example.github.io' "$u" | tr -d '\r' | grep -i '^access-control-allow-origin' || echo none)
+            echo "$u -> $code cors=[$cors] $(head -c 200 /tmp/body)"
+          done
+          curl -s -m 60 https://api.sleeper.app/v1/players/nfl -o /tmp/players.json; ls -la /tmp/players.json
+          python3 -c "import json;d=json.load(open('/tmp/players.json'));a=[p for p in d.values() if p.get('active') and p.get('team')];print(len(d),'players',len(a),'active on a team',sum(1 for p in a if p.get('espn_id')),'with espn_id');print([ (p.get('full_name'),p.get('team'),p.get('position'),p.get('espn_id')) for p in a[:5]])"

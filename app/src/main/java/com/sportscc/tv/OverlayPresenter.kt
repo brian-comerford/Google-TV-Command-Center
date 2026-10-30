@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.sportscc.core.Alert
 import com.sportscc.core.Prop
+import com.sportscc.core.Pace
 import com.sportscc.core.PropProgress
 import com.sportscc.core.StatFormat
 
@@ -135,6 +136,15 @@ class OverlayPresenter(private val context: Context) {
                 addView(value)
             }, LinearLayout.LayoutParams(dp(420), LinearLayout.LayoutParams.WRAP_CONTENT))
             addView(track, LinearLayout.LayoutParams(dp(420), dp(6)).apply { topMargin = dp(3) })
+            val pace = p.projected
+            val paceWins = p.paceWinning
+            if (status.isEmpty() && pace != null && paceWins != null) {
+                addView(TextView(context).apply {
+                    text = "On pace for ${Pace.format(pace)}"
+                    setTextColor(Color.parseColor(if (paceWins) "#34C759" else "#FFB020"))
+                    textSize = 12f
+                }, LinearLayout.LayoutParams(dp(420), LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(2) })
+            }
         }
     }
 
