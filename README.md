@@ -98,7 +98,10 @@ down the right side and live scores plus the Live Feed scrolling along the botto
   a name. ☆ adds a channel to **Favorites**. **◀ Ch / Ch ▶** (or the remote's channel buttons) step through
   the list you picked from. **Refresh** downloads a linked playlist again. Channel names, logos, groups and
   `#EXTVLCOPT` User-Agent / Referer lines are read from the playlist.
-- **Side by side:** **Split** puts two streams next to each other. ◀ ▶ move between the two sides (the
+- **Side by side:** **Split** puts two streams next to each other, each kept in its own shape (16:9 for
+  most streams), with that game's score, situation, last play and your cards for it filling the space
+  underneath (assign the stream to its game in **Games** for this). The card column on the right makes way
+  so the video is bigger. ◀ ▶ move between the two sides (the
   highlighted one has the sound and the remote), ▼ picks a channel for that side, and **Single** (or Back)
   goes back to one stream, keeping the side you're on.
 - **Streams for games:** press **Games** for today's games (from the leagues on your list). Play a stream

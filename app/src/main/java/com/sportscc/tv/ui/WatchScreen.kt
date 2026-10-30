@@ -11,6 +11,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -111,6 +112,8 @@ private class Pane(val view: StreamPlayerView) {
     var gameId by mutableStateOf<String?>(null)
     /** Known to be HLS even if the link doesn't say .m3u8. */
     var hls = false
+    /** The video's shape (width / height), from the stream once it starts; 16:9 until then. */
+    var aspect by mutableStateOf(16f / 9f)
 }
 
 /** "BUF in the red zone: switch?" for a game with a stream assigned. */
@@ -299,6 +302,7 @@ fun WatchScreen(
                 val pr = prompt
                 if (pr != null) { prompt = null; watchFeed(pr.feed); true } else false
             }
+            pane.view.onAspect = { a -> pane.aspect = a.coerceIn(1f, 2.4f) }
             pane.view.onStatus = { st ->
                 pane.status = st
                 if (st.state != StreamStatus.State.PLAYING) pane.showInfo++
@@ -467,24 +471,37 @@ fun WatchScreen(
                 // The browser and both players stay in the same place in the tree whatever the layout, so they're never rebuilt.
                 Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(6.dp))) {
                     AndroidView(factory = { browser }, modifier = Modifier.fillMaxSize())
-                    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(if (split) 6.dp else 0.dp)) {
+                    Row(
+                        Modifier.fillMaxSize().then(if (split) Modifier.background(Palette.Bg) else Modifier),
+                        horizontalArrangement = Arrangement.spacedBy(if (split) 8.dp else 0.dp),
+                    ) {
                         panes.forEachIndexed { i, pane ->
                             val visible = anyStream && pane in showing
-                            Box(
-                                (if (visible) Modifier.weight(1f) else Modifier.width(0.dp)).fillMaxHeight()
-                                    .then(if (split && i == active) Modifier.border(3.dp, Palette.Accent, RoundedCornerShape(6.dp)) else Modifier),
-                            ) {
-                                AndroidView(
-                                    factory = { pane.view },
-                                    modifier = Modifier.fillMaxSize().padding(if (split) 3.dp else 0.dp),
-                                    update = { it.visibility = if (visible) View.VISIBLE else View.INVISIBLE },
-                                )
-                                if (visible) {
-                                    val c = pane.channel
-                                    if (c != null) PaneInfo(c, pane, Modifier.align(Alignment.BottomStart))
-                                    else Text(
-                                        "Press ▼ for channels, or Games",
-                                        fontSize = 15.sp, color = Palette.Muted, modifier = Modifier.align(Alignment.Center),
+                            // Split screen: each video keeps its own shape at the top, and its game's stats fill the space below.
+                            Column((if (visible) Modifier.weight(1f) else Modifier.width(0.dp)).fillMaxHeight()) {
+                                Box(
+                                    (if (split) Modifier.fillMaxWidth().aspectRatio(pane.aspect) else Modifier.fillMaxSize())
+                                        .then(if (split && i == active) Modifier.border(3.dp, Palette.Accent, RoundedCornerShape(6.dp)) else Modifier),
+                                ) {
+                                    AndroidView(
+                                        factory = { pane.view },
+                                        modifier = Modifier.fillMaxSize().padding(if (split) 3.dp else 0.dp),
+                                        update = { it.visibility = if (visible) View.VISIBLE else View.INVISIBLE },
+                                    )
+                                    if (visible) {
+                                        val c = pane.channel
+                                        if (c != null) PaneInfo(c, pane, Modifier.align(Alignment.BottomStart))
+                                        else Text(
+                                            "Press ▼ for channels, or Games",
+                                            fontSize = 15.sp, color = Palette.Muted, modifier = Modifier.align(Alignment.Center),
+                                        )
+                                    }
+                                }
+                                if (split && visible) {
+                                    PaneStats(
+                                        game = pane.gameId?.let { id -> games.firstOrNull { it.id == id } },
+                                        cards = cards, feed = feed, active = i == active,
+                                        modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp),
                                     )
                                 }
                             }
@@ -503,7 +520,8 @@ fun WatchScreen(
                 }
                 if (showBottom) BottomTicker(cards, feed)
             }
-            if (showRight) SidePanel(cards, Modifier.width(250.dp).fillMaxHeight())
+            // In split screen each side's own panel shows its cards, so the side column makes way for bigger video.
+            if (showRight && !split) SidePanel(cards, Modifier.width(250.dp).fillMaxHeight())
         }
 
         AlertBanner(banner, Modifier.align(Alignment.TopEnd).padding(top = 40.dp), width = 360.dp)
@@ -550,6 +568,64 @@ fun WatchScreen(
                 onUnassign = { id -> streams.unassign(id); panes.forEach { p -> if (p.gameId == id) p.gameId = null } },
                 onClose = { val back = assigning != null; assigning = null; dialog = if (back) "channels" else null; if (!back) focusContent() },
             )
+        }
+    }
+}
+
+/**
+ * Under one side of a split screen: that game's score, clock and situation, what makes it exciting,
+ * the last play, and your cards in it (props with their pace). A stream with no game assigned shows
+ * the live scores of your games instead.
+ */
+@Composable
+private fun PaneStats(game: Game?, cards: List<Card>, feed: List<Alert>, active: Boolean, modifier: Modifier) {
+    Column(
+        modifier.clip(RoundedCornerShape(10.dp)).background(Palette.Panel)
+            .then(if (active) Modifier.border(1.dp, Palette.Accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp)) else Modifier)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (game == null) {
+            Text("Not linked to a game", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text("Games → Assign this stream to its game to see that game's stats here.", fontSize = 11.sp, color = Palette.Muted)
+            val live = cards.mapNotNull { it.game }.distinctBy { it.id }.filter { it.state != GameState.PRE }
+            live.forEach { g ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(g.scoreLine, fontSize = 14.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+                    StatusPill(g)
+                }
+            }
+            feed.take(4).forEach { a -> Text("• ${a.title}", fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            return@Column
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (game.state == GameState.PRE) "${game.away.abbreviation} @ ${game.home.abbreviation}" else game.scoreLine,
+                fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f),
+            )
+            StatusPill(game)
+        }
+        val interest = Action.interest(game)
+        val situation = listOfNotNull(game.situation, interest.reason?.takeIf { interest.heat != Heat.NONE }).joinToString("  ·  ")
+        if (situation.isNotBlank()) {
+            Text(situation, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (interest.heat == Heat.HOT) Palette.Live else Palette.Warn, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        game.lastPlay?.let { Text(it, fontSize = 12.sp, color = Palette.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+        val mine = cards.filter { c ->
+            c.game?.id == game.id && c !is TeamCard ||
+                c is ParlayCard && c.state.legs.any { it.game?.id == game.id }
+        }
+        // Two cards side by side, as many rows as fit.
+        mine.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row.forEach { c -> Box(Modifier.weight(1f)) { MiniCard(c) } }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        if (mine.isEmpty()) {
+            val keys = setOf(game.home.abbreviation, game.away.abbreviation)
+            feed.filter { a -> keys.any { a.title.contains(it) || (a.detail ?: "").contains(it) } }.take(4)
+                .forEach { a -> Text("• ${a.title}", fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     }
 }

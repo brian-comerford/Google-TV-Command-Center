@@ -41,6 +41,8 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
     var onStatus: ((StreamStatus) -> Unit)? = null
     /** OK pressed; return true to take it (e.g. to accept a "switch to this game?" prompt) instead of pausing. */
     var onOk: (() -> Boolean)? = null
+    /** The video's shape (width / height) once the stream reports it. */
+    var onAspect: ((Float) -> Unit)? = null
     /** Split screen: left/right move between the two sides instead of skipping. */
     var onSideStep: ((Int) -> Unit)? = null
 
@@ -83,6 +85,7 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
         view.player = p
         p.playWhenReady = true
         if (warm == null) p.prepare()
+        else p.videoSize.takeIf { it.width > 0 && it.height > 0 }?.let { onAspect?.invoke(it.width * it.pixelWidthHeightRatio / it.height) }
         onStatus?.invoke(StreamStatus(if (warm != null && p.playbackState == Player.STATE_READY) StreamStatus.State.PLAYING else StreamStatus.State.LOADING))
     }
 
@@ -148,6 +151,11 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
         p.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) { if (p === player) report() }
             override fun onIsPlayingChanged(isPlaying: Boolean) { if (p === player) report() }
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                if (p === player && videoSize.width > 0 && videoSize.height > 0) {
+                    onAspect?.invoke(videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height)
+                }
+            }
             override fun onPlayerError(error: PlaybackException) {
                 // Paused too long on a live stream: jump back to live instead of failing.
                 if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
