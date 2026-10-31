@@ -146,6 +146,15 @@ class MainActivity : ComponentActivity() {
 
         BackHandler(enabled = stack.size > 1) { pop() }
 
+        // The app crashed last time: show what happened, and send it to the phone site to copy.
+        var crash by remember { mutableStateOf(CrashLog.read(this@MainActivity)) }
+        LaunchedEffect(Unit) { crash?.let { scc.sync.sendCrashReport(it) } }
+        crash?.let { report ->
+            androidx.compose.ui.window.Dialog(onDismissRequest = { CrashLog.clear(this@MainActivity); crash = null }) {
+                com.sportscc.tv.ui.CrashReport(report, onClose = { CrashLog.clear(this@MainActivity); crash = null })
+            }
+        }
+
         // "Open on TV" from the phone (a page, a stream or a playlist): jump to the Watch screen,
         // or open it there if it's already showing.
         val incoming by scc.sync.incomingUrl.collectAsStateWithLifecycle()

@@ -23,6 +23,7 @@ class SccApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashLog.install(this)
         store = WatchlistStore(this)
         browser = com.sportscc.tv.browser.BrowserStore(this)
         streams = com.sportscc.tv.stream.StreamStore(this)

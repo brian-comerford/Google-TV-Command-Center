@@ -136,6 +136,7 @@
   const topicIn = c => `scc-tv-${normalize(c).toLowerCase()}-in`;
   const topicTv = c => `scc-tv-${normalize(c).toLowerCase()}-tv`;
   const topicOpen = c => `scc-tv-${normalize(c).toLowerCase()}-open`;
+  const topicDiag = c => `scc-tv-${normalize(c).toLowerCase()}-diag`;
   const pretty = c => { const n = normalize(c); return n.slice(0, 4) + '-' + n.slice(4); };
 
   // ---------- teams & rosters ----------
@@ -235,6 +236,24 @@
   });
 
   // ---------- linking ----------
+  // The TV sends its last crash report here (CrashLog on the TV) so it can be copied and shared.
+  async function loadDiag() {
+    $('diagBox').hidden = true;
+    if (!code) return;
+    try {
+      const msg = await newestOnAll(topicDiag(code), '12h');
+      if (!msg || !msg.message) return;
+      $('diagText').textContent = msg.message;
+      $('diagWhen').textContent = 'The TV app crashed and sent this at ' + new Date(msg.time * 1000).toLocaleString() + '.';
+      $('diagBox').hidden = false;
+    } catch (e) { /* nothing to show */ }
+  }
+  $('diagCopy').addEventListener('click', async () => {
+    const t = $('diagText').textContent;
+    try { await navigator.clipboard.writeText(t); $('diagCopy').textContent = 'Copied'; }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($('diagText')); getSelection().removeAllRanges(); getSelection().addRange(r); $('diagCopy').textContent = 'Selected: copy it'; }
+  });
+
   function renderLink() {
     $('linkForm').hidden = !!code;
     $('linked').hidden = !code;
@@ -248,6 +267,7 @@
     $('codeError').hidden = true;
     code = n; store.set('code', code); renderLink();
     if (!items.length) loadFromTv();
+    loadDiag();
     return true;
   }
   $('codeForm').addEventListener('submit', e => { e.preventDefault(); link($('codeInput').value); });
@@ -851,5 +871,5 @@
   else if (fromUrl) $('codeInput').value = pretty(fromUrl);
   // Open the install steps until a TV has been linked (you need the app before you can link).
   $('installCard').open = !code;
-  render(); renderLink();
+  render(); renderLink(); loadDiag();
 })();

@@ -74,6 +74,9 @@ object PairingCode {
 
     /** Phone -> TV links to open in the TV's built-in browser (plain text: a URL or search words). */
     fun openTopic(code: String) = "scc-tv-${normalize(code).lowercase()}-open"
+
+    /** TV -> phone crash reports, so they can be copied from the phone site. */
+    fun diagTopic(code: String) = "scc-tv-${normalize(code).lowercase()}-diag"
 }
 
 /** [attachmentUrl] is set when the sender posted a file (e.g. a playlist) instead of a short message. */

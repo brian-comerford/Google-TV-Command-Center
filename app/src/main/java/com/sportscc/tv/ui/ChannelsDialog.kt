@@ -3,6 +3,12 @@
 package com.sportscc.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,6 +55,8 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.sportscc.core.Channel
 import com.sportscc.tv.stream.StreamStore
 import kotlinx.coroutines.launch
@@ -103,7 +111,14 @@ fun ChannelsDialog(
     val favUrls = remember(favorites) { favorites.map { it.url }.toSet() }
 
     val firstFocus = remember { FocusRequester() }
+    val searchFocus = remember { FocusRequester() }
     val listState = rememberLazyListState()
+    // Deep in a long list: ◀ on a channel, or Back, goes straight back to the top (search, groups, buttons).
+    fun jumpTop() {
+        scope.launch { listState.scrollToItem(0) }
+        runCatching { searchFocus.requestFocus() }
+    }
+    BackHandler(enabled = listState.firstVisibleItemIndex > 0) { jumpTop() }
     // Once per list: start on the channel that's playing (if it's in this list), else the first one.
     var focusedFor by remember { mutableStateOf<String?>("-") }
     val target = playing?.let { p -> shown.indexOfFirst { it.url == p.url } }?.takeIf { it >= 0 } ?: 0
@@ -182,6 +197,7 @@ fun ChannelsDialog(
                         }
                     },
                     modifier = Modifier
+                        .focusRequester(searchFocus)
                         .width(320.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Palette.Bg)
@@ -190,7 +206,7 @@ fun ChannelsDialog(
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    if (loading) "Loading…" else "${shown.size} shown",
+                    if (loading) "Loading…" else "${shown.size} shown  ·  ◀ or Back on a channel: back to the top",
                     fontSize = 12.sp, color = Palette.Muted,
                 )
             }
@@ -205,6 +221,7 @@ fun ChannelsDialog(
                         onPlay = { onPlay(c, shown) },
                         onFavorite = { streams.toggleFavorite(c) },
                         onAssign = onAssign?.let { f -> { f(c) } },
+                        onLeft = { jumpTop() },
                         modifier = if (i == target) Modifier.focusRequester(firstFocus) else Modifier,
                     )
                 }
@@ -221,12 +238,15 @@ private fun ChannelRow(
     onPlay: () -> Unit,
     onFavorite: () -> Unit,
     onAssign: (() -> Unit)?,
+    onLeft: () -> Unit,
     modifier: Modifier,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(
             onClick = onPlay,
-            modifier = modifier.weight(1f),
+            modifier = modifier.weight(1f).onPreviewKeyEvent { e ->
+                if (e.key == Key.DirectionLeft) { if (e.type == KeyEventType.KeyDown) onLeft(); true } else false
+            },
             shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
             colors = ClickableSurfaceDefaults.colors(
                 containerColor = if (isPlaying) Palette.Accent.copy(alpha = 0.25f) else Palette.PanelHi,
@@ -238,7 +258,11 @@ private fun ChannelRow(
         ) {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(width = 44.dp, height = 28.dp), contentAlignment = Alignment.Center) {
-                    if (c.logo != null) AsyncImage(model = c.logo, contentDescription = null, modifier = Modifier.fillMaxSize())
+                    // Playlist logos can be huge images: always decode them at thumbnail size.
+                    if (c.logo != null) AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(c.logo).size(120, 76).crossfade(false).build(),
+                        contentDescription = null, modifier = Modifier.fillMaxSize(),
+                    )
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {

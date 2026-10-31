@@ -111,6 +111,14 @@ class PhoneSyncManager(
 
     private fun saveCode(c: String) = prefs.edit().putString(KEY_CODE, c).apply()
 
+    /** Sends a crash report to the phone site (Copy it from there to share it). */
+    fun sendCrashReport(text: String) {
+        scope.launch {
+            runCatching { relays.publish(PairingCode.diagTopic(_code.value), text.take(3_800)) }
+                .onFailure { Log.w(TAG, "crash report not sent", it) }
+        }
+    }
+
     private suspend fun publishState() {
         runCatching {
             relays.publish(
