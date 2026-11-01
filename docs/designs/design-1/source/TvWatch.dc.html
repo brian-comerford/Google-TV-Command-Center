@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TV watch, split screen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<style>
+body{margin:0}
+a{color:#F6C446}a:hover{color:#FFD873}
+</style>
+</helmet>
+<div style="width: 1280px; height: 720px; box-sizing: border-box; padding: 20px 36px; background: #26272B; color: #EDEDF0; font-family: Poppins, system-ui, sans-serif; display: flex; flex-direction: column; gap: 12px; overflow: hidden">
+
+  <!-- toolbar: pills, the focused one in yellow -->
+  <div style="display: flex; align-items: center; gap: 8px">
+    <button style="height: 38px; padding: 0 16px; border-radius: 19px; border: 2px solid #5C5E66; background: transparent; color: #EDEDF0; font: 500 14px Poppins, sans-serif">Browser</button>
+    <button style="height: 38px; padding: 0 16px; border-radius: 19px; border: 2px solid #5C5E66; background: transparent; color: #EDEDF0; font: 500 14px Poppins, sans-serif">Channels</button>
+    <button style="height: 38px; padding: 0 16px; border-radius: 19px; border: 2px solid #5C5E66; background: transparent; color: #EDEDF0; font: 500 14px Poppins, sans-serif">Games</button>
+    <button style="height: 38px; padding: 0 18px; border-radius: 19px; border: 0; background: #F6C446; color: #26272B; font: 600 14px Poppins, sans-serif">Single</button>
+    <button aria-label="Previous channel" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid #5C5E66; background: transparent; display: grid; place-items: center">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EDEDF0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+    </button>
+    <button aria-label="Next channel" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid #5C5E66; background: transparent; display: grid; place-items: center">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EDEDF0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+    <button aria-label="Pause" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid #5C5E66; background: transparent; display: grid; place-items: center">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="#EDEDF0"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>
+    </button>
+    <div style="flex-grow: 1"></div>
+    <button style="height: 38px; padding: 0 16px; border-radius: 19px; border: 2px solid #F6C446; background: transparent; color: #F6C446; font: 600 14px Poppins, sans-serif">Auto-switch: Ask</button>
+    <button style="height: 38px; padding: 0 16px; border-radius: 19px; border: 2px solid #5C5E66; background: transparent; color: #EDEDF0; font: 500 14px Poppins, sans-serif">Layout</button>
+    <button style="height: 38px; padding: 0 16px; border-radius: 19px; border: 2px solid #F07B3F; background: transparent; color: #F07B3F; font: 600 14px Poppins, sans-serif">Exit</button>
+  </div>
+
+  <!-- two sides -->
+  <div style="flex-grow: 1; display: flex; gap: 16px; min-height: 0">
+    <!-- left side: has the remote and the sound -->
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0">
+      <div style="position: relative; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; background: #1B1C1F; box-shadow: 0 0 0 3px #F6C446">
+        <div style="position: absolute; inset: 0; display: grid; place-items: center; color: #6A6C74; font-size: 13px; letter-spacing: 2px">[ VIDEO · BUF @ MIA ]</div>
+        <div style="position: absolute; left: 14px; top: 12px; padding: 5px 12px; border-radius: 12px; background: #26272B; font-size: 12px; font-weight: 600">Sunday Red Zone</div>
+        <div style="position: absolute; right: 14px; top: 12px; width: 30px; height: 30px; border-radius: 50%; background: #F6C446; display: grid; place-items: center">
+          <svg role="img" aria-label="Sound on" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#26272B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16 9a4 4 0 0 1 0 6"></path></svg>
+        </div>
+      </div>
+      <div style="flex-grow: 1; min-height: 0; background: #34353B; border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="flex-grow: 1; font-size: 20px; font-weight: 800">BUF 24 – 17 MIA</span>
+          <span style="padding: 4px 10px; border-radius: 10px; background: #F07B3F; color: #26272B; font-size: 12px; font-weight: 700">3RD 8:42</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #F6C446">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #F6C446"></span>BUF driving · 2nd &amp; 7 at MIA 34
+        </div>
+        <div style="display: flex; gap: 10px">
+          <div style="flex: 1; display: flex; align-items: center; gap: 10px; background: #3E3F46; border-radius: 14px; padding: 8px 10px">
+            <svg aria-hidden="true" width="38" height="38" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="#2C2D32" stroke-width="5"></circle><circle cx="22" cy="22" r="18" fill="none" stroke="#F6C446" stroke-width="5" stroke-dasharray="88.8 113.1" stroke-linecap="round" transform="rotate(-90 22 22)"></circle><text x="22" y="26" text-anchor="middle" font-size="11" font-weight="700" fill="#EDEDF0">31</text></svg>
+            <div><div style="font-size: 13px; font-weight: 600">Allen O 39.5 Rush</div><div style="font-size: 11px; color: #4FC48A; font-weight: 600">On pace for 51</div></div>
+          </div>
+          <div style="flex: 1; display: flex; align-items: center; gap: 10px; background: #3E3F46; border-radius: 14px; padding: 8px 10px">
+            <div style="width: 38px; height: 38px; border-radius: 50%; background: #4FC48A; display: grid; place-items: center; flex-shrink: 0">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E2A22" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>
+            </div>
+            <div><div style="font-size: 13px; font-weight: 600">BUF −3.5</div><div style="font-size: 11px; color: #4FC48A; font-weight: 600">Covering by 3.5</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- right side: muted -->
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0">
+      <div style="position: relative; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; background: #1B1C1F">
+        <div style="position: absolute; inset: 0; display: grid; place-items: center; color: #6A6C74; font-size: 13px; letter-spacing: 2px">[ VIDEO · CIN @ PIT ]</div>
+        <div style="position: absolute; left: 14px; top: 12px; padding: 5px 12px; border-radius: 12px; background: #26272B; font-size: 12px; font-weight: 600">Gridiron Two</div>
+        <div style="position: absolute; right: 14px; top: 12px; width: 30px; height: 30px; border-radius: 50%; border: 2px solid #5C5E66; background: #26272B; box-sizing: border-box; display: grid; place-items: center">
+          <svg role="img" aria-label="Muted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B3B5BD" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M17 9l4 6M21 9l-4 6"></path></svg>
+        </div>
+      </div>
+      <div style="flex-grow: 1; min-height: 0; background: #34353B; border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="flex-grow: 1; font-size: 20px; font-weight: 800">CIN 13 – 10 PIT</span>
+          <span style="padding: 4px 10px; border-radius: 10px; background: #F07B3F; color: #26272B; font-size: 12px; font-weight: 700">3RD 2:05</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #F07B3F">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #F07B3F"></span>CIN in the red zone · 1st &amp; 10 at PIT 12
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; background: #3E3F46; border-radius: 14px; padding: 8px 12px">
+          <svg aria-hidden="true" width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="#2C2D32" stroke-width="5"></circle><circle cx="22" cy="22" r="18" fill="none" stroke="#F6C446" stroke-width="5" stroke-dasharray="81 113.1" stroke-linecap="round" transform="rotate(-90 22 22)"></circle></svg>
+          <div style="flex-grow: 1"><div style="font-size: 13px; font-weight: 600">Ja'Marr Chase · fantasy</div><div style="font-size: 11px; color: #B3B5BD">4 REC · 58 YDS · on pace for 13.7</div></div>
+          <span style="font-size: 22px; font-weight: 800; color: #F6C446">9.8</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ticker -->
+  <div style="height: 48px; flex-shrink: 0; display: flex; align-items: center; gap: 14px; background: #34353B; border-radius: 24px; padding: 0 18px; overflow: hidden; white-space: nowrap">
+    <span style="padding: 4px 10px; border-radius: 10px; background: #F07B3F; color: #26272B; font-size: 12px; font-weight: 700">LIVE</span>
+    <span style="font-size: 15px; font-weight: 600">BUF 24 – 17 MIA · 3rd 8:42</span>
+    <span style="color: #5C5E66">|</span>
+    <span style="font-size: 15px; font-weight: 600">CIN 13 – 10 PIT · 3rd 2:05</span>
+    <span style="color: #5C5E66">|</span>
+    <span style="font-size: 15px; font-weight: 600; color: #4FC48A">Prop hit: Allen over 249.5 pass yds</span>
+    <span style="color: #5C5E66">|</span>
+    <span style="font-size: 15px; font-weight: 600">Chase +1 REC, +14 YDS</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

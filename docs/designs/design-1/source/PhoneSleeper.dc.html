@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone, Sleeper import</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<style>
+body{margin:0}
+a{color:#F6C446}a:hover{color:#FFD873}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 34px 22px 26px; background: #2E2F34; color: #EDEDF0; font-family: Poppins, system-ui, sans-serif; display: flex; flex-direction: column; gap: 16px; overflow: hidden">
+  <div style="text-align: center">
+    <div style="font-size: 22px; font-weight: 700; color: #F6C446">Sleeper fantasy</div>
+    <div style="font-size: 12px; color: #B3B5BD">No password needed</div>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 8px; height: 50px; border-radius: 25px; background: #46474E; padding: 0 6px 0 18px">
+    <label for="sleeperUser" style="position: absolute; left: -9999px">Sleeper username</label>
+    <input id="sleeperUser" value="brianc" style="flex-grow: 1; min-width: 0; border: 0; background: transparent; color: #EDEDF0; font: 500 14px Poppins, sans-serif; outline: none">
+    <button style="height: 38px; padding: 0 16px; border-radius: 19px; border: 0; background: #F6C446; color: #26272B; font: 700 13px Poppins, sans-serif">Find leagues</button>
+  </div>
+
+  <!-- leagues as cards with an arrow, chosen one outlined -->
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: center; gap: 12px; background: #3A3B41; border-radius: 16px; padding: 12px 14px; box-shadow: 0 0 0 2px #F6C446">
+      <div style="width: 40px; height: 40px; border-radius: 50%; background: #F6C446; display: grid; place-items: center; flex-shrink: 0">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#26272B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg>
+      </div>
+      <div style="flex-grow: 1"><div style="font-size: 15px; font-weight: 600">Office League</div><div style="font-size: 12px; color: #B3B5BD">12 teams · 2026</div></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; background: #3A3B41; border-radius: 16px; padding: 12px 14px">
+      <div style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid #5C5E66; box-sizing: border-box; flex-shrink: 0"></div>
+      <div style="flex-grow: 1"><div style="font-size: 15px; font-weight: 600">Family Dynasty</div><div style="font-size: 12px; color: #B3B5BD">10 teams · 2026</div></div>
+      <a href="#" aria-label="Choose Family Dynasty" style="width: 34px; height: 34px; border-radius: 50%; border: 2px solid #5C5E66; box-sizing: border-box; display: grid; place-items: center">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EDEDF0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- starters or whole roster: segmented pill -->
+  <div style="display: flex; background: #3A3B41; border-radius: 24px; padding: 4px">
+    <button style="flex: 1; height: 40px; border-radius: 20px; border: 0; background: #F6C446; color: #26272B; font: 700 13px Poppins, sans-serif">This week's starters</button>
+    <button style="flex: 1; height: 40px; border-radius: 20px; border: 0; background: transparent; color: #EDEDF0; font: 500 13px Poppins, sans-serif">Whole roster</button>
+  </div>
+
+  <!-- the players, as a 4-up ring grid like the reference's 25% / 57% gauges -->
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; text-align: center">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+      <svg aria-hidden="true" width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="30" r="25" fill="none" stroke="#46474E" stroke-width="6"></circle><circle cx="30" cy="30" r="25" fill="none" stroke="#F6C446" stroke-width="6" stroke-dasharray="157 157" transform="rotate(-90 30 30)"></circle><text x="30" y="34" text-anchor="middle" font-size="12" font-weight="700" fill="#EDEDF0">QB</text></svg>
+      <div style="font-size: 11px; font-weight: 600">Mahomes</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+      <svg aria-hidden="true" width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="30" r="25" fill="none" stroke="#46474E" stroke-width="6"></circle><circle cx="30" cy="30" r="25" fill="none" stroke="#F6C446" stroke-width="6" stroke-dasharray="157 157" transform="rotate(-90 30 30)"></circle><text x="30" y="34" text-anchor="middle" font-size="12" font-weight="700" fill="#EDEDF0">WR</text></svg>
+      <div style="font-size: 11px; font-weight: 600">Chase</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+      <svg aria-hidden="true" width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="30" r="25" fill="none" stroke="#46474E" stroke-width="6"></circle><circle cx="30" cy="30" r="25" fill="none" stroke="#F6C446" stroke-width="6" stroke-dasharray="157 157" transform="rotate(-90 30 30)"></circle><text x="30" y="34" text-anchor="middle" font-size="12" font-weight="700" fill="#EDEDF0">RB</text></svg>
+      <div style="font-size: 11px; font-weight: 600">McCaffrey</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+      <svg aria-hidden="true" width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="30" r="25" fill="none" stroke="#46474E" stroke-width="6" stroke-dasharray="4 5"></circle><text x="30" y="34" text-anchor="middle" font-size="12" font-weight="700" fill="#F07B3F">DEF</text></svg>
+      <div style="font-size: 11px; font-weight: 600; color: #F07B3F">Can't track</div>
+    </div>
+  </div>
+
+  <label style="display: flex; align-items: flex-start; gap: 12px; background: #3A3B41; border-radius: 16px; padding: 12px 14px; font-size: 12px; color: #B3B5BD">
+    <input type="checkbox" checked style="width: 20px; height: 20px; accent-color: #4FC48A; margin: 0; flex-shrink: 0">
+    <span><b style="color: #EDEDF0">Keep it matched to my lineup.</b> The TV checks Sleeper every few hours and adds or drops players as you set your lineup.</span>
+  </label>
+
+  <div style="margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 8px">
+    <button style="width: 100%; height: 54px; border-radius: 27px; border: 0; background: #F6C446; color: #26272B; font: 700 17px Poppins, sans-serif">Add 8 players</button>
+    <div style="font-size: 12px; color: #B3B5BD">Added as fantasy players: live stats and PPR</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

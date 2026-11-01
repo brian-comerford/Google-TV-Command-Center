@@ -14,6 +14,12 @@
   - (The cloud sandbox's git proxy refuses tag pushes; GitHub-side branch creation and CI-created
     release tags work.)
 
+## Designs
+- The app uses **Design 1** (charcoal, yellow, orange, green for passing bets). See `docs/designs/`.
+- **"Design 2"** (purple / pink-purple glow) is saved for later in `docs/designs/design-2/` (screens,
+  board source, colors in `docs/designs/README.md`). If the user asks to switch to design 2, restyle the
+  TV app (`app/.../ui/Components.kt` Palette and components) and the phone site (`web/style.css`) to it.
+
 ## Building and testing
 - The Android SDK isn't available in the cloud sandbox; CI (`.github/workflows/build-apk.yml`) builds the APK.
 - `core/` is plain Kotlin and can be tested locally with a Gradle build that includes only `:core`.
