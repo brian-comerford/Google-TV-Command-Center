@@ -60,6 +60,11 @@ object StatCatalog {
             c("rushing", "YDS", weight = 0.1), c("rushing", "TD", weight = 6.0),
             c("receiving", "REC", weight = 1.0), c("receiving", "YDS", weight = 0.1), c("receiving", "TD", weight = 6.0),
             c("fumbles", "LOST", weight = -2.0),
+            // Kickers (standard scoring): XP +1, FG +3 (+4 from 40-49, +5 from 50+), a miss -1.
+            // FG40 / FG50 are counted from the game's scoring plays (see EspnParser.parseSummary).
+            c("kicking", "FG", weight = 4.0), c("kicking", "FG", weight = -1.0, part = 1),
+            c("kicking", "XP", weight = 2.0), c("kicking", "XP", weight = -1.0, part = 1),
+            c("kicking", "FG40", weight = 1.0), c("kicking", "FG50", weight = 2.0),
         ),
         def(
             "fpts_half", "Fantasy Points (Half PPR)", "Half PPR",
@@ -67,6 +72,11 @@ object StatCatalog {
             c("rushing", "YDS", weight = 0.1), c("rushing", "TD", weight = 6.0),
             c("receiving", "REC", weight = 0.5), c("receiving", "YDS", weight = 0.1), c("receiving", "TD", weight = 6.0),
             c("fumbles", "LOST", weight = -2.0),
+            // Kickers (standard scoring): XP +1, FG +3 (+4 from 40-49, +5 from 50+), a miss -1.
+            // FG40 / FG50 are counted from the game's scoring plays (see EspnParser.parseSummary).
+            c("kicking", "FG", weight = 4.0), c("kicking", "FG", weight = -1.0, part = 1),
+            c("kicking", "XP", weight = 2.0), c("kicking", "XP", weight = -1.0, part = 1),
+            c("kicking", "FG40", weight = 1.0), c("kicking", "FG50", weight = 2.0),
         ),
     )
 
@@ -130,6 +140,7 @@ object StatCatalog {
             StatGroup("rushing", "Rush", listOf("CAR", "YDS", "TD")),
             StatGroup("receiving", "Rec", listOf("REC", "TGTS", "YDS", "TD")),
             StatGroup("fumbles", "Fum", listOf("LOST")),
+            StatGroup("kicking", "Kick", listOf("FG", "XP", "LONG")),
         )
         SportKind.BASKETBALL -> listOf(
             StatGroup(null, "", listOf("MIN", "PTS", "REB", "AST", "3PT", "STL", "BLK")),
@@ -145,7 +156,7 @@ object StatCatalog {
     }
 
     /** Columns that change constantly or aren't counting stats; never worth an alert on their own. */
-    val nonAlertLabels = setOf("MIN", "TOI", "+/-", "IP", "H-AB", "C/ATT", "CAR", "TGTS", "PC", "GA")
+    val nonAlertLabels = setOf("MIN", "TOI", "+/-", "IP", "H-AB", "C/ATT", "CAR", "TGTS", "PC", "GA", "LONG")
 
     /** A tick in one of these is a "big play" (highlighted alert). */
     fun isBigPlay(kind: SportKind, category: String, label: String): Boolean = when (kind) {

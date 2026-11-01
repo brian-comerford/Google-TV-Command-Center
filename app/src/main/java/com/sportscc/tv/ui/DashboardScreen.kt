@@ -5,6 +5,7 @@ package com.sportscc.tv.ui
 import com.sportscc.core.ReleaseInfo
 import com.sportscc.tv.UpdateState
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.StrokeCap
@@ -728,7 +729,11 @@ private fun FeedPanel(feed: List<Alert>, modifier: Modifier) {
         if (feed.isEmpty()) {
             Text("Scores, stat changes and prop updates for your picks will appear here.", fontSize = 12.sp, color = Palette.Muted)
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // New alerts go on top. A keyed list stays put on the item it was showing, which would leave
+        // every new alert above the visible area, so jump back to the top whenever a new one arrives.
+        val feedState = rememberLazyListState()
+        LaunchedEffect(feed.firstOrNull()?.id) { feedState.scrollToItem(0) }
+        LazyColumn(state = feedState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             itemsIndexed(feed, key = { _, a -> a.id }) { i, a -> FeedRow(a, newest = i == 0) }
         }
     }

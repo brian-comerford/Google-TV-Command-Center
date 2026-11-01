@@ -139,7 +139,36 @@ object EspnParser {
                 }
             }
         }
+        addFieldGoalDistances(root, players)
         return BoxScore(gameId, players)
+    }
+
+    /**
+     * The box score only says how many field goals a kicker made, not from how far, but fantasy
+     * scoring pays more for long ones. Count each kicker's 40-49 and 50+ yard field goals from the
+     * game's scoring plays ("S.Shrader 45 Yd Field Goal") as extra kicking columns FG40 and FG50.
+     */
+    private fun addFieldGoalDistances(root: JsonElement, players: MutableMap<String, PlayerLine>) {
+        val kickers = players.values.filter { p -> p.stats.any { it.category == "kicking" } }
+        if (kickers.isEmpty()) return
+        val distance = Regex("""(\d{2})\s*-?\s*(?:yd|yard)s?\.?\s+field goal""", RegexOption.IGNORE_CASE)
+        val fgs = root.arr("scoringPlays").mapNotNull { sp ->
+            val text = sp.str("text") ?: return@mapNotNull null
+            val yards = distance.find(text)?.groupValues?.get(1)?.toIntOrNull() ?: return@mapNotNull null
+            Triple(sp.obj("team").str("id"), text, yards)
+        }
+        for (k in kickers) {
+            val sameTeam = kickers.count { it.teamId == k.teamId }
+            val last = k.name.substringAfterLast(' ').lowercase()
+            val mine = fgs.filter { (team, text, _) ->
+                (team == null || team == k.teamId) && (sameTeam == 1 && team != null || last.isNotEmpty() && text.lowercase().contains(last))
+            }.map { it.third }
+            val extra = listOf(
+                StatEntry("kicking", "FG40", mine.count { it in 40..49 }.toString()),
+                StatEntry("kicking", "FG50", mine.count { it >= 50 }.toString()),
+            )
+            players[k.athleteId] = k.copy(stats = k.stats + extra)
+        }
     }
 
     fun parseTeams(body: String): List<TeamInfo> {
