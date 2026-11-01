@@ -84,7 +84,8 @@ down the right side and live scores plus the Live Feed scrolling along the botto
 - **Open a page:** on the phone website, type a site or search words in **Open on TV**; it opens on the
   TV within a few seconds (the TV app needs to be open). Or press **Search / URL** on the TV, or pick one of your **Saved** sites.
 - **Remote:** the arrows move an on-screen pointer and OK clicks. Push past an edge to scroll, or switch
-  to **Scroll** mode. Up at the top of the page reaches the toolbar. Back goes back a page, then exits.
+  to **Scroll** mode. The toolbar stays hidden so the page or video gets the room: press ▲ (on a stream, or at
+  the top of a page) to bring it back, and ▼ or Back to hide it again. Back goes back a page, then exits.
 - **Full-screen video** fills the browser area, not the whole TV, so the stats stay visible.
 - **Layout:** Right + bottom, Right only, Bottom only, or Browser only. **Desktop site** asks pages
   for their desktop version, which often has a better video player.

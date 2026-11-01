@@ -5,6 +5,12 @@ package com.sportscc.tv.ui
 import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -179,6 +185,11 @@ fun WatchScreen(
     /** Games already offered while they're hot, so the same red-zone trip isn't offered twice. */
     val offered = remember { mutableSetOf<String>() }
     val toolbarFocus = remember { FocusRequester() }
+    // The toolbar hides while you watch; ▲ from the video or the top of a page brings it back.
+    var barVisible by remember { mutableStateOf(false) }
+    var barFocusAsk by remember { mutableIntStateOf(0) }
+    var barHasFocus by remember { mutableStateOf(false) }
+    var showMenuHint by remember { mutableStateOf(true) }
 
     val cur = panes[active]
     val anyStream = panes.any { it.channel != null }
@@ -293,9 +304,9 @@ fun WatchScreen(
             if (u.startsWith("http")) onPage(u)
         }
         browser.onLoading = { progress = it }
-        browser.onExitTop = { runCatching { toolbarFocus.requestFocus() } }
+        browser.onExitTop = { barVisible = true; barFocusAsk++ }
         panes.forEachIndexed { i, pane ->
-            pane.view.onExitTop = { runCatching { toolbarFocus.requestFocus() } }
+            pane.view.onExitTop = { barVisible = true; barFocusAsk++ }
             pane.view.onDown = { active = i; dialog = "channels" }
             pane.view.onChannelStep = { step(it, i) }
             pane.view.onOk = {
@@ -346,6 +357,9 @@ fun WatchScreen(
         delay(300)
         if (dialog == null) focusContent()
     }
+    // Once the toolbar has slid in, put the remote on its first button.
+    LaunchedEffect(barFocusAsk) { if (barFocusAsk > 0) toolbarFocus.requestFocusWhenReady() }
+    LaunchedEffect(Unit) { delay(5_000); showMenuHint = false }
 
     // ---- switch to the action, and preload what's next ----
     val feedGames = remember(games, feeds) { feeds.mapNotNull { f -> games.firstOrNull { it.id == f.gameId }?.let { f to it } } }
@@ -399,6 +413,11 @@ fun WatchScreen(
         assigning = null
         focusContent()
     }
+    // Back with the toolbar open just tucks it away again.
+    BackHandler(enabled = dialog == null && prompt == null && barVisible && barHasFocus) {
+        barVisible = false
+        focusContent()
+    }
 
     val showRight = layout == BrowserLayout.FRAMED || layout == BrowserLayout.RIGHT
     val showBottom = layout == BrowserLayout.FRAMED || layout == BrowserLayout.BOTTOM
@@ -409,6 +428,14 @@ fun WatchScreen(
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 // ---- toolbar ----
+                // Hidden while you watch: ▲ shows it, ▼ (or leaving it for a dialog) hides it again.
+                AnimatedVisibility(visible = barVisible, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                Column(
+                    Modifier.onFocusChanged { f ->
+                        if (f.hasFocus) barHasFocus = true
+                        else if (barHasFocus) { barHasFocus = false; barVisible = false }
+                    },
+                ) {
                 // Scrolls sideways if it runs out of room, so no button ever gets squeezed.
                 Row(
                     Modifier
@@ -417,6 +444,7 @@ fun WatchScreen(
                         .padding(bottom = 4.dp)
                         .onPreviewKeyEvent { e ->
                             if (e.key == Key.DirectionDown && e.type == KeyEventType.KeyDown) {
+                                barVisible = false
                                 focusContent(); true
                             } else false
                         },
@@ -465,6 +493,8 @@ fun WatchScreen(
                     fontSize = 11.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 2.dp, bottom = 3.dp),
                 )
+                }
+                }
                 Box(Modifier.fillMaxWidth().height(2.dp)) {
                     if (!anyStream && progress in 1..99) ProgressBar(progress / 100f, Palette.Accent, Modifier.height(2.dp))
                 }
@@ -509,6 +539,15 @@ fun WatchScreen(
                     }
                     prompt?.let { pr ->
                         SwitchOffer(pr, Modifier.align(Alignment.TopCenter), grabFocus = !anyStream, onWatch = { prompt = null; watchFeed(pr.feed) }, onIgnore = { prompt = null; focusContent() })
+                    }
+                    // With the toolbar hidden: a short "▲ Menu" hint at first, and "Opening…" while a link loads.
+                    if (!barVisible && (showMenuHint || busy != null)) {
+                        Text(
+                            busy ?: "▲  Menu",
+                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.OnAccent,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).clip(RoundedCornerShape(50))
+                                .background(Palette.Accent).padding(horizontal = 14.dp, vertical = 6.dp),
+                        )
                     }
                     switchedNote?.let { note ->
                         Text(
