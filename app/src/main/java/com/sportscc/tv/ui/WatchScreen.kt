@@ -246,12 +246,24 @@ fun WatchScreen(
         applySound()
         dialog = "channels" // pick what goes on the other side
     }
+    // Channel up / down shows the next channel's name at once but starts its stream only once the
+    // presses stop: flipping fast used to start (and tear down) a player per press.
+    var stepJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     fun step(d: Int, side: Int = active) {
         val pane = panes[side]
         val c = pane.channel ?: return
         if (pane.queue.size < 2) return
         val i = pane.queue.indexOfFirst { it.url == c.url }.coerceAtLeast(0)
-        play(pane.queue[(i + d).mod(pane.queue.size)], pane.queue, side = side)
+        val next = pane.queue[(i + d).mod(pane.queue.size)]
+        if (pane.view.preloaded?.url == next.url) { play(next, pane.queue, side = side); return } // already loaded: instant
+        pane.channel = next
+        pane.status = StreamStatus(StreamStatus.State.LOADING)
+        pane.showInfo++
+        stepJob?.cancel()
+        stepJob = scope.launch {
+            delay(450)
+            play(next, pane.queue, side = side)
+        }
     }
     /** Puts [f]'s stream up: in split screen on the side that isn't showing anything exciting, with the sound. */
     fun watchFeed(f: GameFeed) {

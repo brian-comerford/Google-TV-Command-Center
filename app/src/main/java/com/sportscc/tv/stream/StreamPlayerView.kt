@@ -16,6 +16,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -108,7 +109,7 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
         standby = null
         standbyChannel = null
         if (channel == null || channel.url == current?.url) return
-        standby = build(channel, isHls).apply {
+        standby = build(channel, isHls, background = true).apply {
             volume = 0f
             playWhenReady = false
             prepare()
@@ -133,7 +134,12 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
     private var standby: ExoPlayer? = null
     private var standbyChannel: Channel? = null
 
-    private fun build(channel: Channel, isHls: Boolean): ExoPlayer {
+    /**
+     * A player for [channel]. Buffers are kept small on purpose: a TV box runs up to three of these
+     * (two sides of a split screen, or one plus the stream kept warm), and ExoPlayer's defaults (up to
+     * ~130 MB each) ran it out of memory when a lagging stream and a channel change overlapped.
+     */
+    private fun build(channel: Channel, isHls: Boolean, background: Boolean = false): ExoPlayer {
         val headers = channel.headers
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent(headers["User-Agent"] ?: USER_AGENT)
@@ -141,7 +147,13 @@ class StreamPlayerView(context: Context) : FrameLayout(context) {
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(20_000)
+        val load = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(if (background) 6_000 else 15_000, if (background) 10_000 else 30_000, 1_500, 3_000)
+            .setTargetBufferBytes(if (background) 8 * 1024 * 1024 else 32 * 1024 * 1024)
+            .setPrioritizeTimeOverSizeThresholds(false)
+            .build()
         val p = ExoPlayer.Builder(context)
+            .setLoadControl(load)
             .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, http)))
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(10_000)
