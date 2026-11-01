@@ -60,4 +60,27 @@ class SleeperTest {
         // Older phones/TVs leave it out.
         assertNull(SyncCodec.decode("""{"v":1,"items":[]}""").sleeper)
     }
+
+    @Test
+    fun severalLeaguesTogether() {
+        val a = SleeperLineup.toWatch(map.getValue("4046"), "A")
+        val b = SleeperLineup.toWatch(map.getValue("6794"), "B")
+        assertEquals("sleeper:A", a.source)
+        // Both leagues' players stay; one dropped from league A goes, the rest stay.
+        val start = SleeperLineup.merge(emptyList(), listOf(a, b)).items
+        assertEquals(2, start.size)
+        val after = SleeperLineup.merge(start, listOf(b))
+        assertEquals(listOf(a), after.removed)
+        assertEquals(listOf(b.key), after.items.map { it.key })
+        // Players from before several leagues ("sleeper") still count as Sleeper players.
+        assertTrue(SleeperLineup.isFromSleeper(a.copy(source = "sleeper")))
+    }
+
+    @Test
+    fun linksTravelOldAndNew() {
+        val one = SleeperLink("111", "A", "League A")
+        val two = SleeperLink("111", "B", "League B")
+        assertEquals(listOf(one, two), SyncCodec.decode(SyncCodec.encode(SyncPayload(items = emptyList(), sleeper = one, sleeperLinks = listOf(one, two)))).leagues)
+        assertEquals(listOf(one), SyncPayload(items = emptyList(), sleeper = one).leagues) // an older phone
+    }
 }

@@ -26,9 +26,14 @@ data class SyncPayload(
     val v: Int = 1,
     val items: List<WatchItem>,
     val sentAt: Long = 0,
-    /** The Sleeper league the TV keeps your fantasy players matched to, if any. */
+    /** Older phones and TVs: a single Sleeper league. Newer ones send [sleeperLinks] (and this, set to the first). */
     val sleeper: SleeperLink? = null,
-)
+    /** Every Sleeper league the TV keeps your fantasy players matched to. */
+    val sleeperLinks: List<SleeperLink> = emptyList(),
+) {
+    /** The linked leagues, from either field. */
+    val leagues: List<SleeperLink> get() = sleeperLinks.ifEmpty { listOfNotNull(sleeper) }
+}
 
 /**
  * Wire format shared with web/app.js: "z1:" + base64(gzip(json)). Plain JSON is accepted too.

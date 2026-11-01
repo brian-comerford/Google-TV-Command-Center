@@ -38,26 +38,31 @@ class SleeperManager(
 
     fun start() {
         scope.launch {
-            store.sleeper.collectLatest { link ->
-                link ?: return@collectLatest
+            store.sleeper.collectLatest { links ->
+                if (links.isEmpty()) return@collectLatest
                 while (true) {
-                    runCatching { refresh(link) }.onFailure { Log.w(TAG, "Sleeper refresh failed", it) }
+                    runCatching { refresh(links) }.onFailure { Log.w(TAG, "Sleeper refresh failed", it) }
                     withTimeoutOrNull(EVERY_MS) { kick.first() }
                 }
             }
         }
     }
 
-    private suspend fun refresh(link: SleeperLink) = withContext(Dispatchers.IO) {
+    /** Every linked league's lineup together; if any league can't be read this time, nothing changes. */
+    private suspend fun refresh(links: List<SleeperLink>) = withContext(Dispatchers.IO) {
         // The ESPN lookup only changes with trades and signings: reload it once a day.
         if (map.isEmpty() || System.currentTimeMillis() - mapLoadedAt > 24 * 60 * 60_000L) {
             map = SleeperLineup.parseMap(HttpText.get(BuildConfig.REMOTE_URL + "data/NFL/sleeper-players.json"))
             mapLoadedAt = System.currentTimeMillis()
         }
-        val ids = SleeperLineup.playerIds(HttpText.get(SleeperLineup.rostersUrl(link.leagueId)), link.userId, link.startersOnly)
-            ?: return@withContext
-        val lineup = ids.mapNotNull { map[it] }.map { SleeperLineup.toWatch(it) }
-        if (lineup.isEmpty()) return@withContext // don't wipe the list over a bad response
+        val lineup = ArrayList<com.sportscc.core.PlayerWatch>()
+        for (link in links) {
+            val ids = SleeperLineup.playerIds(HttpText.get(SleeperLineup.rostersUrl(link.leagueId)), link.userId, link.startersOnly)
+                ?: return@withContext
+            val players = ids.mapNotNull { map[it] }.map { SleeperLineup.toWatch(it, link.leagueId) }
+            if (players.isEmpty()) return@withContext // don't wipe the list over a bad response
+            players.filterTo(lineup) { p -> lineup.none { it.key == p.key } }
+        }
         val m = SleeperLineup.merge(store.watchlist.value, lineup)
         if (!m.changed) return@withContext
         store.replaceAll(m.items)

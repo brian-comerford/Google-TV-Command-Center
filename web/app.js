@@ -109,9 +109,18 @@
   let dirty = store.get('dirty', false);
   let lastSent = store.get('lastSent', 0);
   // The Sleeper team the TV keeps fantasy players matched to (SleeperLink in core), or null.
-  let sleeper = store.get('sleeper', null);
+  // Every Sleeper team the TV keeps fantasy players matched to, one per league (SleeperLink in core).
+  // Players carry source "sleeper:<league id>" so each league's players can be swapped on their own.
+  let sleeperLinks = store.get('sleeperLinks', null) || (store.get('sleeper', null) ? [store.get('sleeper', null)] : []);
+  const isSleeper = it => it.type === 'player' && typeof it.source === 'string' && (it.source === 'sleeper' || it.source.startsWith('sleeper:'));
+  // Players added before several leagues were possible say just "sleeper": they belong to the one league there was.
+  function tagOldSleeperPlayers() {
+    if (sleeperLinks.length !== 1) return;
+    items.forEach(it => { if (it.type === 'player' && it.source === 'sleeper') it.source = 'sleeper:' + sleeperLinks[0].leagueId; });
+  }
 
-  function save() { store.set('items', items); store.set('dirty', dirty); store.set('sleeper', sleeper); }
+  function save() { store.set('items', items); store.set('dirty', dirty); store.set('sleeperLinks', sleeperLinks); }
+  tagOldSleeperPlayers();
   function changed() { dirty = true; save(); render(); }
 
   // ---------- wire format (matches SyncCodec in core) ----------
@@ -195,7 +204,7 @@
         `<span class="prop${p.side === 'UNDER' ? ' under' : ''}"><b>${p.side === 'UNDER' ? 'U' : 'O'} ${num(p.line)}</b> ${esc(statShort(it.league, p.statId))}
           <button class="x" data-unprop="${i}:${j}" aria-label="Remove prop">×</button></span>`).join('');
       return `<div class="item"><div class="item-head">${pic(it.headshot)}
-          <div class="who"><div class="name">${esc(it.name)}</div><div class="sub"><span class="league">${esc(league.label)}</span> ${it.source === 'sleeper' ? '<span class="badge sleeper">SLEEPER</span> ' : ''}${esc([it.teamAbbreviation, it.position, it.jersey ? '#' + it.jersey : null].filter(Boolean).join(' · '))}</div></div>
+          <div class="who"><div class="name">${esc(it.name)}</div><div class="sub"><span class="league">${esc(league.label)}</span> ${isSleeper(it) ? '<span class="badge sleeper">SLEEPER</span> ' : ''}${esc([it.teamAbbreviation, it.position, it.jersey ? '#' + it.jersey : null].filter(Boolean).join(' · '))}</div></div>
           ${moveBtns(i)}<button class="x" data-remove="${i}" aria-label="Remove ${esc(it.name)}">×</button></div>
         ${it.fantasy
           ? `<div class="props"><span class="prop fantasy"><b>Fantasy</b> live stats${fantasyLabel(it.league) ? ' + ' + esc(fantasyLabel(it.league)) : ''}</span><button class="addprop" data-mode="${i}" type="button">Switch to bets</button></div></div>`
@@ -280,7 +289,8 @@
       if (!msg) { s.textContent = 'Nothing from the TV yet. Open Sports Command Center on the TV and try again.'; return; }
       const payload = await decode(msg.message);
       items = (payload.items || []).map(it => it.type === 'player' ? Object.assign({ props: [] }, it) : it);
-      sleeper = payload.sleeper || null;
+      sleeperLinks = payload.sleeperLinks || (payload.sleeper ? [payload.sleeper] : []);
+      tagOldSleeperPlayers();
       dirty = false; save(); render();
       s.textContent = `Loaded ${items.length} item${items.length === 1 ? '' : 's'} from the TV.`;
     } catch (e) {
@@ -295,7 +305,8 @@
     $('sendBtn').disabled = true;
     renderStatus('Sending…', '');
     try {
-      const body = await encode(Object.assign({ v: 1, items, sentAt: Date.now() }, sleeper ? { sleeper } : {}));
+      // "sleeper" (the first league) is for TVs from before several leagues; newer ones read "sleeperLinks".
+      const body = await encode(Object.assign({ v: 1, items, sentAt: Date.now() }, sleeperLinks.length ? { sleeper: sleeperLinks[0], sleeperLinks } : {}));
       if (body.length > 4000) throw new Error('the list is too long for one message. Remove a few items and try again.');
       await publishAll(topicIn(code), body);
       dirty = false; lastSent = Date.now(); store.set('lastSent', lastSent); save();
@@ -432,18 +443,19 @@
   };
   function renderSleeperLinked() {
     const el = $('sleeperLinked');
-    el.hidden = !sleeper;
-    if (!sleeper) return;
-    el.innerHTML = `<span>Following <b>${esc(sleeper.leagueName || 'your league')}</b>${sleeper.username ? ' as ' + esc(sleeper.username) : ''}
-      · ${sleeper.startersOnly ? 'starters' : 'whole roster'}</span><button class="btn ghost" id="sleeperUnlink" type="button">Stop</button>`;
-    $('sleeperUnlink').addEventListener('click', () => {
-      sleeper = null;
-      // Keep the players, but as ordinary fantasy players the TV won't change any more.
-      items.forEach(it => { if (it.source === 'sleeper') delete it.source; });
-      changed(); renderSleeperLinked();
-      $('sleeperStatus').textContent = 'Stopped. Your players stay on the list. Tap Send to TV.';
-    });
+    el.hidden = !sleeperLinks.length;
+    el.innerHTML = sleeperLinks.map(l => `<div class="row between" style="width:100%"><span>Following <b>${esc(l.leagueName || 'a league')}</b>${l.username ? ' as ' + esc(l.username) : ''}
+      · ${l.startersOnly ? 'starters' : 'whole roster'}</span><button class="btn ghost" data-unlink="${esc(l.leagueId)}" type="button">Stop</button></div>`).join('');
   }
+  $('sleeperLinked').addEventListener('click', e => {
+    const b = e.target.closest('[data-unlink]'); if (!b) return;
+    const id = b.dataset.unlink;
+    sleeperLinks = sleeperLinks.filter(l => l.leagueId !== id);
+    // Keep that league's players, but as ordinary fantasy players the TV won't change any more.
+    items.forEach(it => { if (it.source === 'sleeper:' + id) delete it.source; });
+    changed(); renderSleeperLinked();
+    $('sleeperStatus').textContent = 'Stopped following that league. Its players stay on the list. Tap Send to TV.';
+  });
   function sleeperPlayerIds() {
     const mine = (sRosters || []).find(r => r.owner_id === sUser.user_id || (r.co_owners || []).includes(sUser.user_id));
     if (!mine) return null;
@@ -456,7 +468,7 @@
     try { map = await getJson('data/NFL/sleeper-players.json'); } catch (e) { map = null; }
     if (!map) { $('sleeperPlayers').innerHTML = '<p class="error">The Sleeper player list isn\'t ready yet. Try again later.</p>'; sLineup = []; updateSleeperGo(); return; }
     sLineup = ids.map(id => map[id]).filter(Boolean).map(([athleteId, teamId, teamAbbreviation, name, position, headshot]) => ({
-      type: 'player', league: 'NFL', athleteId, name, teamId, teamAbbreviation, position, headshot, props: [], fantasy: true, source: 'sleeper',
+      type: 'player', league: 'NFL', athleteId, name, teamId, teamAbbreviation, position, headshot, props: [], fantasy: true, source: 'sleeper:' + sLeague.league_id,
     }));
     const missing = ids.length - sLineup.length;
     $('sleeperPlayers').innerHTML = sLineup.map(p => `<div class="splayer">${pic(p.headshot)}<div><b>${esc(p.name)}</b><div class="sub">${esc(p.position || '')} · ${esc(p.teamAbbreviation)}</div></div></div>`).join('') +
@@ -468,7 +480,7 @@
     $('sleeperCount').textContent = sLineup.length ? `${sLineup.length} players` : '';
   }
   $('sleeperBtn').addEventListener('click', () => {
-    $('sleeperUser').value = (sleeper && sleeper.username) || store.get('sleeperUser', '');
+    $('sleeperUser').value = (sleeperLinks[0] && sleeperLinks[0].username) || store.get('sleeperUser', '');
     $('sleeperLeagues').hidden = true; $('sleeperOptions').hidden = true; sLineup = []; updateSleeperGo();
     renderSleeperLinked();
     sdlg.showModal();
@@ -519,12 +531,15 @@
   $('sleeperGo').addEventListener('click', () => {
     const auto = $('sleeperAuto').checked;
     const key = it => it.type === 'player' ? `player:${it.league}:${it.athleteId}` : null;
-    // Same rule as the TV (SleeperLineup.merge): swap the old Sleeper players, keep anything you added yourself.
-    items = items.filter(it => !(it.type === 'player' && it.source === 'sleeper'));
+    // Same rule as the TV (SleeperLineup.merge): swap THIS league's Sleeper players; other leagues' players and
+    // anything you added yourself stay. A player already on the list (from another league or by hand) isn't added twice.
+    const src = 'sleeper:' + sLeague.league_id;
+    items = items.filter(it => !(it.type === 'player' && it.source === src));
     const have = new Set(items.map(key).filter(Boolean));
     const add = sLineup.filter(p => !have.has(key(p))).map(p => auto ? p : Object.assign({}, p, { source: undefined }));
     items = items.concat(add);
-    sleeper = auto ? { userId: sUser.user_id, leagueId: sLeague.league_id, leagueName: sLeague.name, username: $('sleeperUser').value.trim(), startersOnly: sStarters } : null;
+    sleeperLinks = sleeperLinks.filter(l => l.leagueId !== sLeague.league_id);
+    if (auto) sleeperLinks.push({ userId: sUser.user_id, leagueId: sLeague.league_id, leagueName: sLeague.name, username: $('sleeperUser').value.trim(), startersOnly: sStarters });
     changed();
     sdlg.close();
     renderStatus(`Added ${add.length} Sleeper player${add.length === 1 ? '' : 's'}. Tap Send to TV.`, 'dirty');

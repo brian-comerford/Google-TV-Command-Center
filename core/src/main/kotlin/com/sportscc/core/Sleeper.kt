@@ -65,10 +65,15 @@ object SleeperLineup {
         }.toMap()
     }
 
-    fun toWatch(p: SleeperPlayer) = PlayerWatch(
+    /** "sleeper:<league id>": which league a player came from (plain "sleeper" from before there could be several). */
+    fun sourceFor(leagueId: String) = "$SOURCE:$leagueId"
+
+    fun isFromSleeper(w: WatchItem) = w is PlayerWatch && (w.source == SOURCE || w.source?.startsWith("$SOURCE:") == true)
+
+    fun toWatch(p: SleeperPlayer, leagueId: String? = null) = PlayerWatch(
         league = League.NFL, athleteId = p.athleteId, name = p.name, teamId = p.teamId,
         teamAbbreviation = p.teamAbbreviation, position = p.position, headshot = p.headshot,
-        fantasy = true, source = SOURCE,
+        fantasy = true, source = leagueId?.let { sourceFor(it) } ?: SOURCE,
     )
 
     data class Merge(val items: List<WatchItem>, val added: List<PlayerWatch>, val removed: List<PlayerWatch>) {
@@ -76,14 +81,14 @@ object SleeperLineup {
     }
 
     /**
-     * Your list with the Sleeper players swapped for [lineup]: players that left the lineup go (only
-     * ones that came from Sleeper), new ones are added at the end, and anything you added yourself
-     * stays as it is, even if it's the same player.
+     * Your list with the Sleeper players swapped for [lineup], the players of EVERY linked league
+     * together: players in none of them go (only ones that came from Sleeper), new ones are added at
+     * the end, and anything you added yourself stays as it is, even if it's the same player.
      */
     fun merge(items: List<WatchItem>, lineup: List<PlayerWatch>): Merge {
         val wanted = lineup.associateBy { it.key }
-        val removed = items.filterIsInstance<PlayerWatch>().filter { it.source == SOURCE && it.key !in wanted }
-        val kept = items.filterNot { it is PlayerWatch && it.source == SOURCE && it.key !in wanted }
+        val removed = items.filterIsInstance<PlayerWatch>().filter { isFromSleeper(it) && it.key !in wanted }
+        val kept = items.filterNot { isFromSleeper(it) && it.key !in wanted }
         val present = kept.map { it.key }.toSet()
         val added = lineup.filter { it.key !in present }
         return Merge(kept + added, added, removed)

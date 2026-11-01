@@ -63,14 +63,16 @@ class WatchlistStore(context: Context) {
     private val _settings = MutableStateFlow(load<AppSettings>(KEY_SETTINGS) ?: AppSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
-    /** The Sleeper team your fantasy players follow (set from the phone), or null. */
-    private val _sleeper = MutableStateFlow(load<SleeperLink>(KEY_SLEEPER))
-    val sleeper: StateFlow<SleeperLink?> = _sleeper.asStateFlow()
+    /** The Sleeper teams your fantasy players follow (set from the phone); one per league. */
+    private val _sleeper = MutableStateFlow(
+        load<List<SleeperLink>>(KEY_SLEEPER_LINKS) ?: listOfNotNull(load<SleeperLink>(KEY_SLEEPER)), // older versions kept one
+    )
+    val sleeper: StateFlow<List<SleeperLink>> = _sleeper.asStateFlow()
 
-    fun setSleeper(link: SleeperLink?) {
-        if (link == _sleeper.value) return
-        _sleeper.value = link
-        prefs.edit().putString(KEY_SLEEPER, link?.let { json.encodeToString(it) }).apply()
+    fun setSleeper(links: List<SleeperLink>) {
+        if (links == _sleeper.value) return
+        _sleeper.value = links
+        prefs.edit().putString(KEY_SLEEPER_LINKS, json.encodeToString(links)).remove(KEY_SLEEPER).apply()
     }
 
     private inline fun <reified T> load(key: String): T? =
@@ -134,5 +136,6 @@ class WatchlistStore(context: Context) {
         const val KEY_WATCHLIST = "watchlist"
         const val KEY_SETTINGS = "settings"
         const val KEY_SLEEPER = "sleeper"
+        const val KEY_SLEEPER_LINKS = "sleeperLinks"
     }
 }

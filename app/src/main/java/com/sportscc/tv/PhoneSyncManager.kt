@@ -123,7 +123,12 @@ class PhoneSyncManager(
         runCatching {
             relays.publish(
                 PairingCode.stateTopic(_code.value),
-                SyncCodec.encode(SyncPayload(items = store.watchlist.value, sentAt = System.currentTimeMillis(), sleeper = store.sleeper.value)),
+                SyncCodec.encode(
+                    SyncPayload(
+                        items = store.watchlist.value, sentAt = System.currentTimeMillis(),
+                        sleeper = store.sleeper.value.firstOrNull(), sleeperLinks = store.sleeper.value,
+                    ),
+                ),
             )
         }.onFailure { Log.w(TAG, "publish failed", it) }
     }
@@ -184,7 +189,7 @@ class PhoneSyncManager(
 
     private fun apply(p: SyncPayload) {
         store.replaceAll(p.items)
-        store.setSleeper(p.sleeper)
+        store.setSleeper(p.leagues)
         onApplied()
         val now = System.currentTimeMillis()
         prefs.edit().putLong(KEY_LAST_TIME, now).apply()

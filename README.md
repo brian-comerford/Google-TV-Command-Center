@@ -153,7 +153,9 @@ decided, so results don't reset when the scoreboard moves on to the next day or 
 and choose this week's starters or the whole roster. They're added as fantasy players (live stats + PPR).
 With **Keep it matched to my lineup** on, the TV checks Sleeper every few hours and adds or drops players
 as you change your lineup, with a "Lineup updated from Sleeper" note in the Live Feed. Players you added
-yourself are never touched. Team defenses can't be tracked. **Stop** keeps the players but stops the updates.
+yourself are never touched. Team defenses can't be tracked. You can add several leagues: each keeps its
+own players (importing a league again only swaps that league's), and a player on more than one of your
+teams is listed once. **Stop** next to a league keeps its players but stops updating them.
 
 **On pace for:** during a game, prop bars, parlay and bet legs, game totals and fantasy scores also say where
 the number is headed at the current rate ("On pace for 287"), in green if that pace wins the bet and amber if
