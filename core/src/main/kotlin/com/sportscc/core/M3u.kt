@@ -49,8 +49,10 @@ object M3u {
         return when {
             path.endsWith(".m3u8") || path.endsWith(".m3u") -> LinkKind.STREAM_OR_PLAYLIST
             STREAM_EXTENSIONS.any { path.endsWith(it) } -> LinkKind.STREAM
-            // Xtream-style playlist links: .../get.php?username=..&password=..&type=m3u_plus
+            // Xtream-style playlist links: .../get.php?username=..&password=..&type=m3u_plus,
+            // or .../playlist/<user>/<pass>/m3u_plus
             path.endsWith("/get.php") && query.contains("type=m3u") -> LinkKind.PLAYLIST
+            path.endsWith("m3u_plus") || path.endsWith("/m3u") || query.contains("type=m3u") -> LinkKind.PLAYLIST
             query.contains("output=m3u8") || query.contains("output=hls") -> LinkKind.STREAM
             else -> LinkKind.WEB
         }
@@ -178,6 +180,44 @@ object M3u {
         ATTR.findAll(head).forEach { m -> attrs[m.groupValues[1].lowercase()] = m.groupValues[2] }
         val title = if (titleStart >= 0) body.substring(titleStart).trim() else ""
         return attrs to title
+    }
+
+    /**
+     * Copies a playlist line by line, keeping live channels and dropping on-demand movies and series,
+     * which make IPTV lists (Xtream "m3u_plus") tens of megabytes. Returns (kept, dropped) entry counts.
+     */
+    fun copyLive(lines: Sequence<String>, out: java.io.Writer): Pair<Int, Int> {
+        var kept = 0
+        var dropped = 0
+        val pending = ArrayList<String>() // the #EXTINF / #EXTVLCOPT lines of the entry being read
+        for (raw in lines) {
+            val line = raw.trimEnd('\r')
+            val t = line.trim()
+            when {
+                t.isEmpty() -> Unit
+                t.startsWith("#") && !t.startsWith("#EXTINF", true) && !t.startsWith("#EXTVLCOPT", true) && !t.startsWith("#EXTGRP", true) && pending.isEmpty() ->
+                    { out.write(line); out.write("\n") } // #EXTM3U, #PLAYLIST and other headers
+                t.startsWith("#") -> pending += line
+                else -> {
+                    if (isOnDemand(t, pending)) dropped++ else {
+                        pending.forEach { out.write(it); out.write("\n") }
+                        out.write(line); out.write("\n")
+                        kept++
+                    }
+                    pending.clear()
+                }
+            }
+        }
+        return kept to dropped
+    }
+
+    /** Xtream servers put movies under /movie/ and series under /series/; many lists also tag them in the group. */
+    fun isOnDemand(url: String, info: List<String>): Boolean {
+        val u = url.lowercase()
+        if ("/movie/" in u || "/series/" in u) return true
+        val group = info.firstOrNull { it.startsWith("#EXTINF", true) }?.let { ATTR.findAll(it).firstOrNull { m -> m.groupValues[1].equals("group-title", true) }?.groupValues?.get(2) }
+            ?.lowercase() ?: return false
+        return group.startsWith("vod") || " vod" in group || group.startsWith("movies") || group.startsWith("series") || "24/7" in group && "movie" in group
     }
 
     private fun headerName(k: String): String = when (k.lowercase()) {

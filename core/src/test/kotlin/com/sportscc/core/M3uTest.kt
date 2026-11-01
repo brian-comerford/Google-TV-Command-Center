@@ -83,4 +83,34 @@ class M3uTest {
         assertEquals("", m.message)
         assertEquals("https://ntfy.sh/file/a1.m3u", m.attachmentUrl)
     }
+
+    @Test
+    fun keepsLiveChannelsAndDropsMoviesAndSeries() {
+        val xtream = """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="espn" tvg-name="US: ESPN" group-title="US Sports",US: ESPN
+            http://host:8080/user/pass/1234.ts
+            #EXTINF:-1 tvg-name="Dune (2021)" group-title="VOD: Movies",Dune (2021)
+            http://host:8080/movie/user/pass/555.mkv
+            #EXTINF:-1 group-title="Series: Drama",Show S01 E01
+            http://host:8080/series/user/pass/777.mp4
+            #EXTINF:-1 group-title="NFL Sunday",NFL 01
+            #EXTVLCOPT:http-user-agent=VLC
+            http://host:8080/user/pass/9999.ts
+        """.trimIndent()
+        val out = java.io.StringWriter()
+        assertEquals(2 to 2, M3u.copyLive(xtream.lineSequence(), out))
+        val live = M3u.parse(out.toString())
+        assertEquals(listOf("US: ESPN", "NFL 01"), live.map { it.name })
+        assertEquals(mapOf("User-Agent" to "VLC"), live[1].headers)
+        assertTrue(out.toString().startsWith("#EXTM3U"))
+    }
+
+    @Test
+    fun recognisesXtreamPlaylistLinks() {
+        assertEquals(LinkKind.PLAYLIST, M3u.classify("http://line.example.com:8080/get.php?username=xxx&password=xxx&type=m3u_plus&output=ts"))
+        assertEquals(LinkKind.PLAYLIST, M3u.classify("http://line.example.com/playlist/xxx/xxx/m3u_plus"))
+        assertEquals(LinkKind.PLAYLIST, M3u.classify("http://line.example.com/api/list?type=m3u&user=xxx"))
+        assertEquals(LinkKind.STREAM_OR_PLAYLIST, M3u.classify("http://line.example.com/xxx.m3u"))
+    }
 }

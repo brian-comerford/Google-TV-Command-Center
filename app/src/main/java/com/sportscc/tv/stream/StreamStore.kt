@@ -2,6 +2,7 @@ package com.sportscc.tv.stream
 
 import android.content.Context
 import com.sportscc.core.Channel
+import com.sportscc.core.HttpStatusException
 import com.sportscc.core.HttpText
 import com.sportscc.core.M3u
 import kotlinx.coroutines.Dispatchers
@@ -74,20 +75,81 @@ class StreamStore(context: Context) {
     /** The channels in [id], read from the TV's copy. */
     suspend fun channels(id: String): List<Channel> = withContext(Dispatchers.IO) {
         synchronized(parsed) { parsed[id] }
-            ?: M3u.parse(file(id).takeIf { it.exists() }?.readText() ?: "").also { synchronized(parsed) { parsed[id] = it } }
+            ?: forPlayer(M3u.parse(file(id).takeIf { it.exists() }?.readText() ?: "")).also { synchronized(parsed) { parsed[id] = it } }
     }
 
-    /** Downloads a playlist and keeps it (replacing one with the same address). */
-    suspend fun addFromUrl(url: String, name: String? = null, downloaded: String? = null): Playlist {
-        val (bare, headers) = M3u.splitHeaders(url)
-        val text = downloaded ?: withContext(Dispatchers.IO) { HttpText.get(bare, headers) }
+    /**
+     * Downloads a playlist and keeps it (replacing one with the same address). It's streamed straight
+     * to the TV's storage, keeping only live channels: IPTV lists with movies and series run to tens of MB.
+     */
+    suspend fun addFromUrl(url: String, name: String? = null): Playlist = withContext(Dispatchers.IO) {
+        val (bare, given) = M3u.splitHeaders(url)
+        val headers = if (given.containsKey("User-Agent")) given else given + ("User-Agent" to HttpText.PLAYER_AGENT)
         val existing = _playlists.value.firstOrNull { it.url == url }
-        return add(text, url, name ?: existing?.name ?: M3u.title(text) ?: nameFromUrl(bare), existing?.id)
+        val id = existing?.id ?: "p${System.currentTimeMillis()}"
+        val part = File(dir, "$id.part")
+        val start = StringBuilder()
+        val (kept, dropped) = try {
+            val conn = HttpText.open(bare, headers, 60_000)
+            try {
+                HttpText.unzipping(conn.inputStream).bufferedReader(Charsets.UTF_8).useLines { lines ->
+                    part.bufferedWriter().use { out ->
+                        M3u.copyLive(lines.onEach { if (start.length < 300) start.append(it.take(300)).append(' ') }, out)
+                    }
+                }
+            } finally {
+                conn.disconnect()
+            }
+        } catch (e: HttpStatusException) {
+            part.delete()
+            throw IOException(
+                when (e.code) {
+                    401, 403 -> "the provider refused it (HTTP ${e.code}). Check the username and password in the link, or the subscription may have ended."
+                    404 -> "the provider says it doesn't exist (HTTP 404). Check the link."
+                    in 500..599 -> "the provider's server had a problem (HTTP ${e.code}). Try again in a few minutes."
+                    else -> "the provider answered HTTP ${e.code}."
+                },
+            )
+        } catch (e: java.net.SocketTimeoutException) {
+            part.delete()
+            throw IOException("the provider took too long to answer. Try again, or check the link.")
+        } catch (e: java.net.UnknownHostException) {
+            part.delete()
+            throw IOException("the TV couldn't find the provider's server (${e.message}). Check the link.")
+        }
+        if (kept == 0) {
+            part.delete()
+            val said = start.toString().trim()
+            throw IOException(
+                when {
+                    dropped > 0 -> "it only has movies and series ($dropped), no live channels."
+                    said.isEmpty() -> "the provider sent back an empty playlist. The trial may not have started yet, or the account has no channels."
+                    M3u.isHls(said) -> "that's a single stream, not a channel list."
+                    else -> "no channels found. The provider sent: \"${said.take(140)}\""
+                },
+            )
+        }
+        val target = file(id)
+        target.delete()
+        if (!part.renameTo(target)) { part.copyTo(target, overwrite = true); part.delete() }
+        val channels = forPlayer(M3u.parse(target.readText()))
+        synchronized(parsed) { parsed[id] = channels }
+        val p = Playlist(id, name ?: existing?.name ?: nameFromUrl(bare), url, channels.size, System.currentTimeMillis())
+        putPlaylists(listOf(p) + _playlists.value.filterNot { it.id == id })
+        p
     }
 
     /** Keeps a playlist sent as text (a file from the phone). */
-    suspend fun addFromText(text: String): Playlist =
-        add(text, null, M3u.title(text) ?: "Playlist from phone", null)
+    suspend fun addFromText(text: String): Playlist = withContext(Dispatchers.IO) {
+        val live = java.io.StringWriter()
+        val (kept, dropped) = M3u.copyLive(text.lineSequence(), live)
+        if (kept == 0) throw IOException(if (dropped > 0) "it only has movies and series, no live channels." else if (M3u.isHls(text)) "that's a single stream, not a channel list." else "no channels found in that playlist.")
+        add(live.toString(), null, M3u.title(text) ?: "Playlist from phone", null)
+    }
+
+    /** IPTV servers often refuse players they don't recognize, so channels without their own User-Agent use a media player's. */
+    private fun forPlayer(list: List<Channel>): List<Channel> =
+        list.map { c -> if (c.headers.containsKey("User-Agent")) c else c.copy(headers = c.headers + ("User-Agent" to HttpText.PLAYER_AGENT)) }
 
     suspend fun refresh(p: Playlist): Playlist = addFromUrl(p.url ?: throw IOException("This playlist was sent as a file, so there's nothing to refresh."), p.name)
 
@@ -105,8 +167,8 @@ class StreamStore(context: Context) {
     }
 
     private suspend fun add(text: String, url: String?, name: String, replaceId: String?): Playlist = withContext(Dispatchers.IO) {
-        val channels = M3u.parse(text)
-        if (channels.isEmpty()) throw IOException(if (M3u.isHls(text)) "That's a single stream, not a channel list." else "No channels found in that playlist.")
+        val channels = forPlayer(M3u.parse(text))
+        if (channels.isEmpty()) throw IOException(if (M3u.isHls(text)) "that's a single stream, not a channel list." else "no channels found in that playlist.")
         val id = replaceId ?: "p${System.currentTimeMillis()}"
         file(id).writeText(text)
         synchronized(parsed) { parsed[id] = channels }

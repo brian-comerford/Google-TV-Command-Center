@@ -176,43 +176,77 @@ class Relays(val bases: List<String> = DEFAULT, timeoutMs: Int = 10_000) {
 
 /** Plain HTTP GET of a text file, following redirects (including http <-> https, which Java won't do itself). */
 object HttpText {
-    fun get(url: String, headers: Map<String, String> = emptyMap(), maxBytes: Int = 20_000_000, timeoutMs: Int = 30_000): String {
+    /** What IPTV servers expect: many refuse requests that don't look like a media player. */
+    const val PLAYER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
+    private const val DEFAULT_AGENT = "Mozilla/5.0 (Linux; Android TV) SportsCommandCenter"
+
+    fun get(url: String, headers: Map<String, String> = emptyMap(), maxBytes: Int = 20_000_000, timeoutMs: Int = 30_000): String =
+        open(url, headers, timeoutMs).useBody { input -> readCapped(input, maxBytes, truncate = false) }
+
+    /** The first [bytes] of a file, e.g. to tell a stream's own playlist from a channel list without downloading it all. */
+    fun peek(url: String, headers: Map<String, String> = emptyMap(), bytes: Int = 64 * 1024, timeoutMs: Int = 20_000): String =
+        open(url, headers, timeoutMs).useBody { input -> readCapped(input, bytes, truncate = true) }
+
+    /** Opens [url] following redirects (including http <-> https, which Java won't do itself). */
+    fun open(url: String, headers: Map<String, String>, timeoutMs: Int): HttpURLConnection {
         var current = url
         repeat(6) {
             val conn = URL(current).openConnection() as HttpURLConnection
-            try {
-                conn.instanceFollowRedirects = false
-                conn.connectTimeout = timeoutMs
-                conn.readTimeout = timeoutMs
-                conn.setRequestProperty("User-Agent", headers["User-Agent"] ?: "Mozilla/5.0 (Linux; Android TV) SportsCommandCenter")
-                headers.forEach { (k, v) -> if (k != "User-Agent") conn.setRequestProperty(k, v) }
-                val code = conn.responseCode
-                if (code in 300..399) {
-                    val loc = conn.getHeaderField("Location") ?: throw IOException("HTTP $code without a location")
-                    current = URL(URL(current), loc).toString()
-                    return@repeat
-                }
-                if (code !in 200..299) throw IOException("HTTP $code")
-                val out = ByteArrayOutputStream()
-                val buf = ByteArray(64 * 1024)
-                conn.inputStream.use { input ->
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        if (out.size() > maxBytes) throw IOException("File is too big")
-                    }
-                }
-                val bytes = out.toByteArray()
-                // Some servers gzip without saying so.
-                val text = if (bytes.size > 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()) {
-                    GZIPInputStream(bytes.inputStream()).use { it.readBytes() }
-                } else bytes
-                return text.toString(Charsets.UTF_8)
-            } finally {
-                conn.disconnect()
+            conn.instanceFollowRedirects = false
+            conn.connectTimeout = timeoutMs
+            conn.readTimeout = timeoutMs
+            conn.setRequestProperty("User-Agent", headers["User-Agent"] ?: DEFAULT_AGENT)
+            headers.forEach { (k, v) -> if (k != "User-Agent") conn.setRequestProperty(k, v) }
+            val code = try {
+                conn.responseCode
+            } catch (e: IOException) {
+                conn.disconnect(); throw e
             }
+            if (code in 300..399) {
+                val loc = conn.getHeaderField("Location")
+                conn.disconnect()
+                current = URL(URL(current), loc ?: throw IOException("HTTP $code without a location")).toString()
+                return@repeat
+            }
+            if (code !in 200..299) {
+                conn.disconnect()
+                throw HttpStatusException(code)
+            }
+            return conn
         }
         throw IOException("Too many redirects")
     }
+
+    private inline fun <T> HttpURLConnection.useBody(block: (java.io.InputStream) -> T): T = try {
+        block(unzipping(inputStream))
+    } finally {
+        disconnect()
+    }
+
+    /** Some servers gzip without saying so. */
+    fun unzipping(raw: java.io.InputStream): java.io.InputStream {
+        val input = java.io.BufferedInputStream(raw)
+        input.mark(2)
+        val b0 = input.read()
+        val b1 = input.read()
+        input.reset()
+        return if (b0 == 0x1f && b1 == 0x8b) GZIPInputStream(input) else input
+    }
+
+    private fun readCapped(input: java.io.InputStream, maxBytes: Int, truncate: Boolean): String {
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(64 * 1024)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            out.write(buf, 0, n)
+            if (out.size() > maxBytes) {
+                if (truncate) break else throw IOException("File is too big")
+            }
+        }
+        return out.toByteArray().toString(Charsets.UTF_8)
+    }
 }
+
+/** A server answered with an error status. */
+class HttpStatusException(val code: Int) : IOException("HTTP $code")

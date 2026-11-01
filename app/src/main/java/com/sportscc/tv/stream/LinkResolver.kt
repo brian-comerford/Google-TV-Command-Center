@@ -33,13 +33,14 @@ object LinkResolver {
                     if (M3u.isHls(body)) throw java.io.IOException("That's the inside of a single stream. Send the stream's link instead.")
                     return Opened.Channels(streams.addFromText(body))
                 }
-                val (url, headers) = M3u.splitHeaders(body)
-                // A stream's own playlist is small; a channel list can be big.
-                val text = runCatching { withContext(Dispatchers.IO) { HttpText.get(url, headers, maxBytes = 20_000_000, timeoutMs = 15_000) } }.getOrNull()
+                val (url, given) = M3u.splitHeaders(body)
+                val headers = if (given.containsKey("User-Agent")) given else given + ("User-Agent" to HttpText.PLAYER_AGENT)
+                // Only look at the start: a stream's own playlist is tiny, a channel list can be huge.
+                val start = runCatching { withContext(Dispatchers.IO) { HttpText.peek(url, headers) } }.getOrNull()
                 when {
-                    text == null -> Opened.Play(M3u.single(body)) // let the player try and explain any error
-                    M3u.isHls(text) -> Opened.Play(M3u.single(body), hls = true)
-                    M3u.parse(text).isNotEmpty() -> Opened.Channels(streams.addFromUrl(body, downloaded = text))
+                    start == null -> Opened.Play(M3u.single(body)) // let the player try and explain any error
+                    M3u.isHls(start) -> Opened.Play(M3u.single(body), hls = true)
+                    start.contains("#EXTINF", ignoreCase = true) -> Opened.Channels(streams.addFromUrl(body))
                     else -> Opened.Play(M3u.single(body))
                 }
             }
