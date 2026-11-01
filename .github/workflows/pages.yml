@@ -35,6 +35,13 @@ jobs:
           node-version: 20
       - name: Save teams and rosters from ESPN
         run: node tools/build-web-data.js web/data
+      # Phones (Safari especially) keep old copies of style.css and app.js; a version in the link
+      # makes every deploy load the new files.
+      - name: Stamp the version on the page's files
+        run: |
+          v="${GITHUB_SHA::8}"
+          sed -i -e "s/href=\"style.css\"/href=\"style.css?v=$v\"/" -e "s/src=\"app.js\"/src=\"app.js?v=$v\"/" -e "s/src=\"espn.js\"/src=\"espn.js?v=$v\"/" web/index.html
+          grep -n "?v=$v" web/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
