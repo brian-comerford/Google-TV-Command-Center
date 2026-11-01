@@ -35,6 +35,8 @@ data class PlayerCard(
     val fantasy: Pair<String, Double>?,
     /** Where the fantasy score is headed at this rate (see [Pace]). */
     val fantasyPace: Double? = null,
+    /** Per prop stat id: (share of the game played, value) seen so far this game, for the pace chart. */
+    val history: Map<String, List<Pair<Double, Double>>> = emptyMap(),
 ) : Card
 
 data class Dashboard(
@@ -63,6 +65,8 @@ data class RefreshResult(val dashboard: Dashboard, val alerts: List<Alert>, val 
 class Tracker(private val client: EspnClient, private val clock: () -> Long = System::currentTimeMillis) {
     private var previous: Snapshot? = null
     private val finalBoxes = mutableMapOf<String, BoxScore>()
+    /** "gameId|athleteId|statId" -> (share of the game played, value), oldest first. */
+    private val history = mutableMapOf<String, MutableList<Pair<Double, Double>>>()
 
     /** Forget the baseline so the next poll doesn't alert (e.g. after the app was paused for hours). */
     fun resetBaseline() {
@@ -126,11 +130,38 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
         val settlements = watchlist.filterIsInstance<ParlayWatch>()
             .flatMap { ParlayEngine.settlements(ParlayEngine.evaluate(it, snapshot)) } +
             watchlist.filterIsInstance<BetWatch>().mapNotNull { BetEngine.settlement(it, snapshot) }
-        RefreshResult(buildDashboard(watchlist, snapshot, now, errors), alerts, settlements)
+        record(watchlist, snapshot)
+        RefreshResult(buildDashboard(watchlist, snapshot, now, errors, history), alerts, settlements)
+    }
+
+    /** Adds this poll's value of every prop stat in a live game to [history]. Counting stats start at 0. */
+    private fun record(watchlist: List<WatchItem>, snap: Snapshot) {
+        history.keys.retainAll { key -> snap.games.containsKey(key.substringBefore('|')) }
+        for (w in watchlist.filterIsInstance<PlayerWatch>()) {
+            val g = gameForTeam(snap.games.values, w.league, w.teamId) ?: continue
+            val e = (if (g.state == GameState.POST) 1.0 else Pace.elapsed(g)) ?: continue
+            val line = snap.boxes[g.id]?.players?.get(w.athleteId)
+            for (p in w.props) {
+                val def = StatCatalog.find(w.league, p.statId) ?: continue
+                val v = def.evaluate(line) ?: 0.0
+                val list = history.getOrPut("${g.id}|${w.athleteId}|${p.statId}") { mutableListOf(0.0 to 0.0) }
+                val last = list.last()
+                if (e > last.first || v != last.second) {
+                    if (e <= last.first) list[list.lastIndex] = e to v else list += e to v
+                }
+                if (list.size > 400) list.removeAt(1)
+            }
+        }
     }
 
     companion object {
-        fun buildDashboard(watchlist: List<WatchItem>, snap: Snapshot, now: Long, errors: List<String>): Dashboard {
+        fun buildDashboard(
+            watchlist: List<WatchItem>,
+            snap: Snapshot,
+            now: Long,
+            errors: List<String>,
+            history: Map<String, List<Pair<Double, Double>>> = emptyMap(),
+        ): Dashboard {
             val cards = watchlist.map { w ->
                 when (w) {
                     is TeamWatch -> TeamCard(w, gameForTeam(snap.games.values, w.league, w.teamId))
@@ -154,7 +185,10 @@ class Tracker(private val client: EspnClient, private val clock: () -> Long = Sy
                         // Fantasy players show 0.0 before kickoff; for others the chip only appears with stats.
                         val points = fantasyDef?.evaluate(line) ?: if (w.fantasy && fantasyDef != null) 0.0 else null
                         val fantasy = points?.let { fantasyDef!!.short to it }
-                        PlayerCard(w, g, line, StatFormat.chips(w.league.kind, line), props, fantasy, points?.let { Pace.project(it, g) })
+                        val hist = if (g == null) emptyMap() else w.props.mapNotNull { p ->
+                            history["${g.id}|${w.athleteId}|${p.statId}"]?.let { p.statId to it.toList() }
+                        }.toMap()
+                        PlayerCard(w, g, line, StatFormat.chips(w.league.kind, line), props, fantasy, points?.let { Pace.project(it, g) }, hist)
                     }
                 }
             }

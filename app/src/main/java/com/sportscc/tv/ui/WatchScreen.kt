@@ -581,7 +581,7 @@ fun WatchScreen(
 private fun PaneStats(game: Game?, cards: List<Card>, feed: List<Alert>, active: Boolean, modifier: Modifier) {
     Column(
         modifier.clip(RoundedCornerShape(10.dp)).background(Palette.Panel)
-            .then(if (active) Modifier.border(1.dp, Palette.Accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp)) else Modifier)
+            .then(if (active) Modifier.border(1.dp, Palette.Accent.copy(alpha = 0.6f), RoundedCornerShape(14.dp)) else Modifier)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -651,15 +651,15 @@ private fun SwitchOffer(p: SwitchPrompt, modifier: Modifier, grabFocus: Boolean,
     val watchFocus = remember { FocusRequester() }
     LaunchedEffect(p, grabFocus) { if (grabFocus) watchFocus.requestFocusWhenReady() }
     Row(
-        modifier.padding(10.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xE6151B26))
-            .border(2.dp, Palette.Live, RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier.padding(10.dp).clip(RoundedCornerShape(20.dp)).background(Palette.Panel)
+            .border(2.dp, Palette.Accent, RoundedCornerShape(20.dp)).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.padding(end = 12.dp)) {
-            Text(p.reason, fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text(p.reason, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Accent)
             Text("Press OK to watch ${p.feed.label} (${p.feed.channel.name}) · Back to ignore", fontSize = 13.sp, color = Palette.Muted)
         }
-        FocusButton("Watch", onWatch, Modifier.focusRequester(watchFocus), accent = Palette.Win, compact = true)
+        FocusButton("Watch", onWatch, Modifier.focusRequester(watchFocus), filled = true, compact = true)
         Spacer(Modifier.width(6.dp))
         FocusButton("Ignore", onIgnore, compact = true)
     }
@@ -737,7 +737,7 @@ private fun MiniCard(card: Card) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(Palette.PanelHi)
-            .then(if (live) Modifier.border(1.dp, Palette.Live.copy(alpha = 0.6f), RoundedCornerShape(10.dp)) else Modifier)
+            .then(if (live) Modifier.border(1.dp, Palette.Live.copy(alpha = 0.6f), RoundedCornerShape(14.dp)) else Modifier)
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         when (card) {
@@ -767,7 +767,7 @@ private fun MiniCard(card: Card) {
                 val line = card.chips.take(4).joinToString(" · ") { "${it.value} ${it.label}" }
                 Text(line.ifBlank { card.game?.let { if (it.state == GameState.PRE) formatStart(it) else "No stats yet" } ?: "No game today" },
                     fontSize = 12.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (!card.watch.fantasy) card.props.forEach { PropRow(it, card.game?.state) }
+                if (!card.watch.fantasy) card.props.forEach { PropRow(it, card.game?.state, container = Palette.Track) }
             }
             is ParlayCard -> {
                 val st = card.state

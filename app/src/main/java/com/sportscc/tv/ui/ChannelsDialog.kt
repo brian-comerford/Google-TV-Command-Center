@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
@@ -252,7 +253,7 @@ private fun ChannelRow(
                 containerColor = if (isPlaying) Palette.Accent.copy(alpha = 0.25f) else Palette.PanelHi,
                 contentColor = Palette.Text,
                 focusedContainerColor = Palette.Accent,
-                focusedContentColor = Color.White,
+                focusedContentColor = Palette.OnAccent,
             ),
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
         ) {
@@ -267,7 +268,7 @@ private fun ChannelRow(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(c.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    c.group?.let { Text(it, fontSize = 11.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    c.group?.let { Text(it, fontSize = 11.sp, color = LocalContentColor.current.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
                 if (isPlaying) Pill("PLAYING", Palette.Live)
             }

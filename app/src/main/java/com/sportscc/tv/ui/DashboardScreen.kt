@@ -5,6 +5,26 @@ package com.sportscc.tv.ui
 import com.sportscc.core.ReleaseInfo
 import com.sportscc.tv.UpdateState
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -67,6 +87,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import com.sportscc.core.Alert
+import com.sportscc.core.League
 import com.sportscc.core.BetCard
 import com.sportscc.core.Card
 import com.sportscc.core.Competitor
@@ -136,14 +157,14 @@ fun DashboardScreen(
             // ---- top bar ----
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("SPORTS COMMAND CENTER", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Palette.Text, letterSpacing = 1.5.sp)
+                    Text("SPORTS COMMAND CENTER", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.Accent, letterSpacing = 2.sp)
                     if (movingName != null) MoveHint(movingName, liveFirst) else StatusLine(dashboard)
                 }
-                FocusButton("Watch", onWatch, Modifier.padding(start = 8.dp), accent = Palette.Live)
-                FocusButton("+ Add", onAdd, Modifier.focusRequester(addFocus).padding(start = 8.dp))
-                FocusButton("Phone", onPhone, Modifier.padding(start = 8.dp))
-                FocusButton("Refresh", onRefresh, Modifier.padding(start = 8.dp))
-                FocusButton("Settings", onSettings, Modifier.padding(start = 8.dp))
+                FocusButton("▶  Watch", onWatch, Modifier.padding(start = 8.dp), filled = true)
+                IconCircleButton(Icons.Default.Add, "Add", onAdd, Modifier.focusRequester(addFocus).padding(start = 10.dp))
+                IconCircleButton(Icons.Default.Phone, "Phone", onPhone, Modifier.padding(start = 10.dp))
+                IconCircleButton(Icons.Default.Refresh, "Refresh", onRefresh, Modifier.padding(start = 10.dp))
+                IconCircleButton(Icons.Default.Settings, "Settings", onSettings, Modifier.padding(start = 10.dp))
             }
             if (update != null) UpdateBanner(update, updateState, onUpdate, onUpdateLater)
             Spacer(Modifier.height(14.dp))
@@ -300,6 +321,19 @@ private fun TeamCardView(card: TeamCard, modifier: Modifier, moving: Boolean, on
         CompetitorRow(g, g.away, watched = g.away.teamId == card.watch.teamId)
         Spacer(Modifier.height(4.dp))
         CompetitorRow(g, g.home, watched = g.home.teamId == card.watch.teamId)
+        val ball = listOf(g.home, g.away).firstOrNull { it.teamId == g.possessionTeamId }
+        val yards = g.yardsToGoal
+        if (g.state == GameState.IN && g.league.kind == SportKind.FOOTBALL && ball != null && yards != null) {
+            Spacer(Modifier.height(10.dp))
+            // Own goal line on the left, the end zone on the right, the ball where it is.
+            val at = ((100 - yards) / 100f).coerceIn(0f, 1f)
+            StepDots(colors = listOf(Palette.Accent, Palette.Accent, null, null), filledTo = at, lineColor = Palette.Accent, marker = at)
+            Row(Modifier.fillMaxWidth()) {
+                Text("${ball.abbreviation} goal", fontSize = 10.sp, color = Palette.Muted, modifier = Modifier.weight(1f))
+                Text(if (g.redZone || yards <= 20) "Red zone · $yards to go" else "$yards yds to go", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = if (g.redZone || yards <= 20) Palette.Live else Palette.Accent)
+                Text("End zone", fontSize = 10.sp, color = Palette.Muted, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+            }
+        }
         val extra = listOfNotNull(g.situation, g.lastPlay).joinToString("\n")
         if (extra.isNotBlank() && g.state == GameState.IN) {
             Spacer(Modifier.height(8.dp))
@@ -381,10 +415,17 @@ private fun PlayerCardView(card: PlayerCard, modifier: Modifier, moving: Boolean
             }
             // Fantasy players lead with the live score instead of over/under bars.
             if (fantasy != null) {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(String.format("%.1f", fantasy.second), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Palette.Accent)
-                    Text("${fantasy.first} PTS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Palette.Muted, letterSpacing = 1.sp)
-                    card.fantasyPace?.let { Text("On pace for ${String.format("%.1f", it)}", fontSize = 12.sp, color = Palette.Muted) }
+                // The design's donut: the ring is how much of the game is played, the points sit inside.
+                val played = g?.let { if (it.state == GameState.POST) 1.0 else Pace.elapsed(it) }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Ring((played ?: 0.0).toFloat(), Palette.Accent, size = 92.dp, stroke = 9.dp) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(String.format("%.1f", fantasy.second), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Text)
+                            Text(fantasy.first, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Palette.Accent)
+                        }
+                    }
+                    card.fantasyPace?.let { Text("On pace for ${String.format("%.1f", it)}", fontSize = 11.sp, color = Palette.Muted) }
+                    if (played != null && g?.state == GameState.IN) Text("Game ${(played * 100).toInt()}% played", fontSize = 10.sp, color = Palette.Muted)
                 }
             }
         }
@@ -400,8 +441,76 @@ private fun PlayerCardView(card: PlayerCard, modifier: Modifier, moving: Boolean
             }
         }
         if (card.props.isNotEmpty()) {
+            // The design's pace chart, for the first prop with points recorded this game.
+            val charted = card.props.firstOrNull { (card.history[it.prop.statId]?.size ?: 0) >= 2 }
+            if (charted != null) {
+                Spacer(Modifier.height(10.dp))
+                PaceChart(charted, card.history.getValue(charted.prop.statId), w.league)
+            }
             Spacer(Modifier.height(10.dp))
             card.props.forEach { PropRow(it, g?.state) }
+        }
+    }
+}
+
+/**
+ * How a prop's stat has grown through the game (share of the game played across), the line dashed in
+ * yellow, and where the pace says it ends up, dotted. Green while it's on track to win, yellow if not.
+ */
+@Composable
+private fun PaceChart(p: PropProgress, points: List<Pair<Double, Double>>, league: League) {
+    val over = p.prop.side == Prop.Side.OVER
+    val good = p.paceWinning ?: p.winning
+    val color = if (good) Palette.Win else Palette.Warn
+    val top = listOf(p.prop.line * 1.25, p.current, p.projected ?: 0.0).maxOrNull()!!.coerceAtLeast(1.0)
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Palette.Track).padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(StatFormat.number(p.current), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                p.def.short + (p.projected?.let { " · on pace for ${Pace.format(it)}" } ?: ""),
+                fontSize = 11.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(bottom = 3.dp),
+            )
+        }
+        Canvas(Modifier.fillMaxWidth().height(70.dp).padding(top = 4.dp)) {
+            val w = size.width
+            val h = size.height
+            fun x(f: Double) = (f.coerceIn(0.0, 1.0) * w).toFloat()
+            fun y(v: Double) = (h - (v / top).coerceIn(0.0, 1.0) * h).toFloat()
+            // quarter lines
+            val periods = when {
+                league == League.NCAAM -> 2
+                league.kind == SportKind.HOCKEY || league.kind == SportKind.BASEBALL -> 3
+                else -> 4
+            }
+            for (i in 1 until periods) drawLine(Palette.PanelHi, Offset(w * i / periods, 0f), Offset(w * i / periods, h), 1f)
+            // the line
+            drawLine(Palette.Accent, Offset(0f, y(p.prop.line)), Offset(w, y(p.prop.line)), 3f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
+            val path = Path().apply { points.forEachIndexed { i, (f, v) -> if (i == 0) moveTo(x(f), y(v)) else lineTo(x(f), y(v)) } }
+            val area = Path().apply {
+                addPath(path)
+                lineTo(x(points.last().first), h)
+                lineTo(x(points.first().first), h)
+                close()
+            }
+            drawPath(area, color.copy(alpha = 0.22f))
+            drawPath(path, color, style = Stroke(5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            val (lf, lv) = points.last()
+            p.projected?.let { proj ->
+                drawLine(color, Offset(x(lf), y(lv)), Offset(w, y(proj)), 4f, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 12f)))
+            }
+            drawCircle(color, 7f, Offset(x(lf), y(lv)))
+        }
+        Row(Modifier.fillMaxWidth()) {
+            val marks = when {
+                league == League.NCAAM -> listOf("1st half", "2nd half")
+                league.kind == SportKind.HOCKEY -> listOf("P1", "P2", "P3")
+                league.kind == SportKind.BASEBALL -> listOf("1st", "4th", "7th")
+                else -> listOf("Q1", "Q2", "Q3", "Q4")
+            }
+            marks.forEach { Text(it, fontSize = 9.sp, color = Palette.Muted, modifier = Modifier.weight(1f)) }
+            Text("${if (over) "line" else "under"} ${StatFormat.number(p.prop.line)}", fontSize = 9.sp, color = Palette.Accent)
         }
     }
 }
@@ -476,8 +585,24 @@ private fun ParlayCardView(card: ParlayCard, modifier: Modifier, moving: Boolean
             },
         )
         Spacer(Modifier.height(6.dp))
+        // The design's step slider: one dot per leg, green once hit, the line filled up to the legs decided.
+        StepDots(
+            colors = st.legs.map { legColor(it.status) },
+            filledTo = if (st.legs.size > 1) (st.legs.count { it.status.decided }.coerceAtMost(st.legs.size - 1)).toFloat() / (st.legs.size - 1) else 1f,
+            lineColor = if (st.status == ParlayStatus.LOST) Palette.Live else Palette.Win,
+        )
+        Spacer(Modifier.height(8.dp))
         st.legs.forEach { LegRow(it) }
     }
+}
+
+/** A leg's dot: green hit, yellow live, orange losing or lost, empty before it starts. */
+internal fun legColor(s: LegStatus): Color? = when (s) {
+    LegStatus.WON -> Palette.Win
+    LegStatus.LOST, LegStatus.LIVE_LOSING -> Palette.Live
+    LegStatus.LIVE_WINNING -> Palette.Warn
+    LegStatus.PUSH -> Palette.Muted
+    LegStatus.PENDING -> null
 }
 
 @Composable
@@ -485,8 +610,8 @@ internal fun LegRow(l: LegState) {
     val (mark, color) = when (l.status) {
         LegStatus.WON -> "✓" to Palette.Win
         LegStatus.LOST -> "✗" to Palette.Live
-        LegStatus.LIVE_WINNING -> "●" to Palette.Win
-        LegStatus.LIVE_LOSING -> "●" to Palette.Warn
+        LegStatus.LIVE_WINNING -> "●" to Palette.Warn
+        LegStatus.LIVE_LOSING -> "●" to Palette.Live
         LegStatus.PUSH -> "–" to Palette.Muted
         LegStatus.PENDING -> "○" to Palette.Muted
     }
@@ -522,32 +647,44 @@ private fun StatChipView(value: String, label: String, accent: Color? = null) {
 }
 
 @Composable
-internal fun PropRow(p: PropProgress, state: GameState?) {
+internal fun PropRow(p: PropProgress, state: GameState?, container: Color = Palette.PanelHi) {
     val over = p.prop.side == Prop.Side.OVER
+    val done = state == GameState.POST
     val color = when {
-        p.winning -> Palette.Win
+        p.winning && (over || done) -> Palette.Win // over hit, or an under that held to the end
+        p.winning -> Palette.Win // an under still holding
         !over -> Palette.Live // under and already past the line: busted
-        state == GameState.POST -> Palette.Live
-        else -> Palette.Warn
+        done -> Palette.Live
+        else -> Palette.Warn // chasing
     }
     val status = when {
-        state == GameState.POST -> if (p.winning) "WON" else if (p.current == p.prop.line) "PUSH" else "LOST"
-        over && p.winning -> "HIT"
-        !over && !p.winning -> "BUSTED"
+        done -> if (p.winning) "WON at ${StatFormat.number(p.current)}" else if (p.current == p.prop.line) "PUSH" else "LOST at ${StatFormat.number(p.current)}"
+        over && p.winning -> "HIT at ${StatFormat.number(p.current)}"
+        !over && !p.winning -> "BUSTED at ${StatFormat.number(p.current)}"
         else -> null
     }
-    Column(Modifier.padding(bottom = 6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "${if (over) "O" else "U"} ${StatFormat.number(p.prop.line)} ${p.def.short}",
-                fontSize = 13.sp, color = Palette.Text, modifier = Modifier.weight(1f),
-            )
-            status?.let { Pill(it, color); Spacer(Modifier.width(6.dp)) }
-            Text(StatFormat.number(p.current), fontSize = 15.sp, fontWeight = FontWeight.Black, color = color)
+    val hit = over && p.winning || done && p.winning
+    // The design's prop row: a ring that fills toward the line, the line itself, and how it's going.
+    Row(
+        Modifier.padding(bottom = 6.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(container).padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Ring(if (hit) 1f else p.fraction.toFloat(), color, size = 38.dp) {
+            if (hit) Text("✓", fontSize = 15.sp, fontWeight = FontWeight.Black, color = Palette.Win)
+            else Text(StatFormat.number(p.current), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Palette.Text, maxLines = 1)
         }
-        Spacer(Modifier.height(3.dp))
-        ProgressBar(p.fraction.toFloat(), color)
-        if (status == null) PaceText(p.projected, p.paceWinning)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "${if (over) "Over" else "Under"} ${StatFormat.number(p.prop.line)} ${p.def.short}",
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            when {
+                status != null -> Text(status, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
+                p.projected != null -> PaceText(p.projected, p.paceWinning, Modifier)
+                else -> Text(if (over) "Chasing · ${StatFormat.number(p.current)}" else "Holding · ${StatFormat.number(p.current)} so far", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
+            }
+        }
     }
 }
 
@@ -557,7 +694,7 @@ internal fun PaceText(projected: Double?, winning: Boolean?, modifier: Modifier 
     if (projected == null || winning == null) return
     Text(
         "On pace for ${Pace.format(projected)}",
-        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (winning) Palette.Win else Palette.Warn,
+        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (winning) Palette.Win else Palette.Live,
         modifier = modifier.padding(top = 2.dp),
     )
 }
@@ -591,25 +728,53 @@ private fun FeedPanel(feed: List<Alert>, modifier: Modifier) {
         if (feed.isEmpty()) {
             Text("Scores, stat changes and prop updates for your picks will appear here.", fontSize = 12.sp, color = Palette.Muted)
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(feed, key = { it.id }) { a -> FeedRow(a) }
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            itemsIndexed(feed, key = { _, a -> a.id }) { i, a -> FeedRow(a, newest = i == 0) }
         }
     }
 }
 
+/** What kind of event an alert is, for its icon: good for your bets, bad for them, a score, or news. */
+private enum class FeedKind { GOOD, BAD, SCORE, INFO }
+
+private fun feedKind(a: Alert): FeedKind {
+    val t = a.title.lowercase()
+    return when {
+        listOf("hit", "cashed", "won", "covering", "holding").any { it in t } -> FeedKind.GOOD
+        listOf("busted", "lost", "bust", "not covering").any { it in t } -> FeedKind.BAD
+        a.big || listOf("touchdown", "field goal", "goal", "home run", "score").any { it in t } -> FeedKind.SCORE
+        else -> FeedKind.INFO
+    }
+}
+
+/** A feed line styled like the design's transaction list; the newest one is highlighted in yellow. */
 @Composable
-private fun FeedRow(a: Alert) {
-    Row {
-        Box(Modifier.width(3.dp).height(44.dp).background(if (a.big) Palette.Live else Palette.Accent))
-        Spacer(Modifier.width(8.dp))
-        Column {
-            Text(
-                "${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(a.time))} · ${a.league.label}",
-                fontSize = 10.sp, color = Palette.Muted,
-            )
-            Text(a.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            a.detail?.let { Text(it, fontSize = 11.sp, color = Palette.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+private fun FeedRow(a: Alert, newest: Boolean) {
+    val kind = feedKind(a)
+    val (circle, icon, tint) = when (kind) {
+        FeedKind.GOOD -> Triple(Palette.Win, Icons.Default.Check, Palette.OnAccent)
+        FeedKind.BAD -> Triple(Palette.Live, Icons.Default.Close, Palette.OnAccent)
+        FeedKind.SCORE -> Triple(Palette.Accent, Icons.Default.KeyboardArrowUp, Palette.OnAccent)
+        FeedKind.INFO -> Triple(Palette.PanelHi, Icons.Default.PlayArrow, Palette.Text)
+    }
+    val fg = if (newest) Palette.OnAccent else Palette.Text
+    val sub = if (newest) Palette.OnAccent else Palette.Muted
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (newest) Palette.Accent else Palette.Panel).padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(32.dp).clip(CircleShape).background(if (newest && kind == FeedKind.SCORE) Palette.OnAccent else circle),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(icon, null, colorFilter = ColorFilter.tint(if (newest && kind == FeedKind.SCORE) Palette.Accent else tint), modifier = Modifier.size(18.dp))
         }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(a.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            a.detail?.let { Text(it, fontSize = 11.sp, color = sub, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+        }
+        Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(a.time)), fontSize = 10.sp, color = sub, modifier = Modifier.padding(start = 6.dp))
     }
 }
 
@@ -620,9 +785,9 @@ fun UpdateBanner(update: ReleaseInfo, state: UpdateState, onUpdate: () -> Unit, 
         Modifier
             .padding(top = 12.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Palette.Accent.copy(alpha = 0.22f))
-            .border(1.dp, Palette.Accent, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(Palette.Panel)
+            .border(2.dp, Palette.Accent, RoundedCornerShape(18.dp))
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -638,7 +803,7 @@ fun UpdateBanner(update: ReleaseInfo, state: UpdateState, onUpdate: () -> Unit, 
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
         }
-        FocusButton(if (state is UpdateState.Downloading) "Downloading…" else "Update now", onUpdate, Modifier.padding(start = 8.dp), accent = Palette.Win)
+        FocusButton(if (state is UpdateState.Downloading) "Downloading…" else "Update now", onUpdate, Modifier.padding(start = 8.dp), filled = true)
         FocusButton("Later", onLater, Modifier.padding(start = 8.dp))
     }
 }
@@ -659,9 +824,9 @@ fun AlertBanner(alert: Alert?, modifier: Modifier = Modifier, width: Dp = 620.dp
         Row(
             Modifier
                 .width(width)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xF0101621))
-                .border(BorderStroke(3.dp, accent), RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(22.dp))
+                .background(Palette.Panel.copy(alpha = 0.97f))
+                .border(BorderStroke(2.dp, accent), RoundedCornerShape(22.dp))
                 .padding(horizontal = 20.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

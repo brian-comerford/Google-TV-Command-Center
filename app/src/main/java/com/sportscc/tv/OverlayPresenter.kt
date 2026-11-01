@@ -2,6 +2,10 @@ package com.sportscc.tv
 
 import android.content.Context
 import android.graphics.Color
+import androidx.core.content.res.ResourcesCompat
+import android.graphics.RectF
+import android.graphics.Paint
+import android.graphics.Canvas
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -51,27 +55,28 @@ class OverlayPresenter(private val context: Context) {
     }
 
     private fun build(alert: Alert): View {
-        val accent = if (alert.big) Color.parseColor("#FF3B30") else Color.parseColor("#3D8BFF")
+        // Design 1: a charcoal card with a yellow (orange for big plays) edge, Poppins type.
+        val accent = if (alert.big) ORANGE else YELLOW
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(14), dp(18), dp(14))
+            setPadding(dp(20), dp(16), dp(20), dp(16))
             background = GradientDrawable().apply {
-                cornerRadius = dp(14).toFloat()
-                setColor(Color.argb(235, 16, 22, 33))
-                setStroke(dp(3), accent)
+                cornerRadius = dp(22).toFloat()
+                setColor(Color.parseColor("#F834353B"))
+                setStroke(dp(2), accent)
             }
             addView(TextView(context).apply {
                 text = "${alert.league.label}${if (alert.big) "  •  BIG PLAY" else ""}"
                 setTextColor(accent)
                 textSize = 13f
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = bold
                 letterSpacing = 0.08f
             })
             addView(TextView(context).apply {
                 text = alert.title
-                setTextColor(Color.WHITE)
+                setTextColor(TEXT)
                 textSize = if (alert.big) 22f else 19f
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = bold
                 maxWidth = dp(460)
                 maxLines = 3
                 ellipsize = TextUtils.TruncateAt.END
@@ -79,8 +84,9 @@ class OverlayPresenter(private val context: Context) {
             alert.detail?.let { d ->
                 addView(TextView(context).apply {
                     text = d
-                    setTextColor(Color.parseColor("#B8C1D1"))
+                    setTextColor(MUTED)
                     textSize = 15f
+                    typeface = regular
                     maxWidth = dp(460)
                     maxLines = if (alert.props.isEmpty()) 3 else 2
                     ellipsize = TextUtils.TruncateAt.END
@@ -90,63 +96,86 @@ class OverlayPresenter(private val context: Context) {
         }
     }
 
-    /** Same colors as the card's bars: green winning, amber still short, red for a busted under. */
+    /** Same as the card's prop rows: a ring toward the line, green winning, yellow chasing, orange busted. */
     private fun propRow(p: PropProgress): View {
         val over = p.prop.side == Prop.Side.OVER
-        val color = Color.parseColor(
-            when {
-                p.winning -> "#34C759"
-                over -> "#FFB020"
-                else -> "#FF3B30"
-            },
-        )
+        val color = when {
+            p.winning -> GREEN
+            over -> YELLOW
+            else -> ORANGE
+        }
         val status = when {
-            over && p.winning -> "  HIT"
-            !over && !p.winning -> "  BUSTED"
-            else -> ""
+            over && p.winning -> "HIT at ${StatFormat.number(p.current)}"
+            !over && !p.winning -> "BUSTED at ${StatFormat.number(p.current)}"
+            else -> null
         }
-        val label = TextView(context).apply {
-            text = "${if (over) "O" else "U"} ${StatFormat.number(p.prop.line)} ${p.def.short}"
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        val value = TextView(context).apply {
-            text = StatFormat.number(p.current) + status
-            setTextColor(color)
-            textSize = 15f
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        val track = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(Color.parseColor("#1E2735")) }
-            val f = p.fraction.toFloat().coerceIn(0f, 1f)
-            addView(View(context).apply {
-                background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(color) }
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, f)
+        val hit = over && p.winning
+        val pace = p.projected
+        val paceWins = p.paceWinning
+        val ring = RingView(context, if (hit) 1f else p.fraction.toFloat(), color, if (hit) "✓" else StatFormat.number(p.current), if (hit) GREEN else TEXT, bold)
+        val texts = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, 0, 0)
+            addView(TextView(context).apply {
+                text = "${if (over) "Over" else "Under"} ${StatFormat.number(p.prop.line)} ${p.def.short}"
+                setTextColor(TEXT)
+                textSize = 14f
+                typeface = semibold
             })
-            addView(View(context), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f - f))
+            val line = status ?: if (pace != null && paceWins != null) "On pace for ${Pace.format(pace)}" else if (over) "Chasing · ${StatFormat.number(p.current)}" else "Holding · ${StatFormat.number(p.current)}"
+            addView(TextView(context).apply {
+                text = line
+                setTextColor(if (status != null) color else if (pace != null && paceWins != null) (if (paceWins) GREEN else ORANGE) else color)
+                textSize = 12f
+                typeface = semibold
+            })
         }
         return LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(8), 0, 0)
-            addView(LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(label)
-                addView(value)
-            }, LinearLayout.LayoutParams(dp(420), LinearLayout.LayoutParams.WRAP_CONTENT))
-            addView(track, LinearLayout.LayoutParams(dp(420), dp(6)).apply { topMargin = dp(3) })
-            val pace = p.projected
-            val paceWins = p.paceWinning
-            if (status.isEmpty() && pace != null && paceWins != null) {
-                addView(TextView(context).apply {
-                    text = "On pace for ${Pace.format(pace)}"
-                    setTextColor(Color.parseColor(if (paceWins) "#34C759" else "#FFB020"))
-                    textSize = 12f
-                }, LinearLayout.LayoutParams(dp(420), LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(2) })
-            }
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = GradientDrawable().apply { cornerRadius = dp(14).toFloat(); setColor(Color.parseColor("#3E3F46")) }
+            addView(ring, LinearLayout.LayoutParams(dp(40), dp(40)))
+            addView(texts)
+            layoutParams = LinearLayout.LayoutParams(dp(420), LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) }
         }
     }
 
+    private val bold by lazy { runCatching { ResourcesCompat.getFont(context, R.font.poppins_bold) }.getOrNull() ?: Typeface.DEFAULT_BOLD }
+    private val semibold by lazy { runCatching { ResourcesCompat.getFont(context, R.font.poppins_semibold) }.getOrNull() ?: Typeface.DEFAULT_BOLD }
+    private val regular by lazy { runCatching { ResourcesCompat.getFont(context, R.font.poppins_regular) }.getOrNull() ?: Typeface.DEFAULT }
+
     private fun dp(v: Int): Int = (v * context.resources.displayMetrics.density).toInt()
+
+    private companion object {
+        val YELLOW = Color.parseColor("#F6C446")
+        val ORANGE = Color.parseColor("#F07B3F")
+        val GREEN = Color.parseColor("#4FC48A")
+        val TEXT = Color.parseColor("#EDEDF0")
+        val MUTED = Color.parseColor("#B3B5BD")
+    }
+}
+
+/** A small ring gauge with a label in the middle, for the overlay's prop rows. */
+private class RingView(
+    context: Context,
+    private val fraction: Float,
+    private val color: Int,
+    private val label: String,
+    private val labelColor: Int,
+    typeface: Typeface,
+) : View(context) {
+    private val d = resources.displayMetrics.density
+    private val track = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5 * d; this.color = Color.parseColor("#2C2D32") }
+    private val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5 * d; strokeCap = Paint.Cap.ROUND; this.color = color }
+    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = labelColor; textSize = 11 * d; textAlign = Paint.Align.CENTER; this.typeface = typeface }
+    private val box = RectF()
+
+    override fun onDraw(canvas: Canvas) {
+        val inset = 2.5f * d
+        box.set(inset, inset, width - inset, height - inset)
+        canvas.drawArc(box, 0f, 360f, false, track)
+        if (fraction > 0f) canvas.drawArc(box, -90f, 360f * fraction.coerceIn(0f, 1f), false, arc)
+        canvas.drawText(label, width / 2f, height / 2f - (text.ascent() + text.descent()) / 2, text)
+    }
 }
